@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -47,7 +48,21 @@ const formSchema = z.object({
   projectId: z.string({ required_error: 'Please select a project.' }),
   dueDate: z.date().nullable().optional(),
   tags: z.string().optional(),
+  isRecurring: z.boolean().default(false),
+  recurrence: z.enum(['daily', 'weekly', 'monthly']).optional(),
+  goalType: z.enum(['count', 'amount']).optional(),
+  goalTarget: z.coerce.number().positive().optional(),
+  goalUnit: z.string().optional(),
+}).refine(data => {
+    if (data.isRecurring) {
+        return !!data.recurrence && !!data.goalType && !!data.goalTarget;
+    }
+    return true;
+}, {
+    message: "Recurring tasks require a recurrence pattern, goal type, and target.",
+    path: ["isRecurring"],
 });
+
 
 type TaskFormValues = z.infer<typeof formSchema>;
 
@@ -76,8 +91,11 @@ export default function TaskForm({
       projectId: defaultProjectId || '',
       dueDate: null,
       tags: '',
+      isRecurring: false,
     },
   });
+
+  const isRecurring = form.watch('isRecurring');
 
   useEffect(() => {
     if (task) {
@@ -87,6 +105,11 @@ export default function TaskForm({
         projectId: task.projectId,
         dueDate: task.dueDate || null,
         tags: task.tags?.join(', ') || '',
+        isRecurring: !!task.recurrence,
+        recurrence: task.recurrence || undefined,
+        goalType: task.goal?.type || undefined,
+        goalTarget: task.goal?.target || undefined,
+        goalUnit: task.goal?.unit || '',
       });
     } else {
       form.reset({
@@ -95,14 +118,22 @@ export default function TaskForm({
         projectId: defaultProjectId || projects[0]?.id || '',
         dueDate: null,
         tags: '',
+        isRecurring: false,
+        recurrence: undefined,
+        goalType: undefined,
+        goalTarget: undefined,
+        goalUnit: '',
       });
     }
   }, [task, open, defaultProjectId, form, projects]);
 
   const handleSubmit = (data: TaskFormValues) => {
+    const { isRecurring, goalType, goalTarget, goalUnit, ...rest } = data;
     const processedData = {
-      ...data,
+      ...rest,
       tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
+      recurrence: isRecurring ? data.recurrence : null,
+      goal: isRecurring && goalType && goalTarget ? { type: goalType, target: goalTarget, unit: goalUnit } : null
     };
     onSubmit(processedData);
   };
@@ -169,7 +200,7 @@ export default function TaskForm({
                   </FormItem>
                 )}
               />
-              <FormField
+               <FormField
                 control={form.control}
                 name="dueDate"
                 render={({ field }) => (
@@ -182,8 +213,10 @@ export default function TaskForm({
                             variant={'outline'}
                             className={cn(
                               'w-full pl-3 text-left font-normal',
-                              !field.value && 'text-muted-foreground'
+                              !field.value && 'text-muted-foreground',
+                               isRecurring && 'opacity-50 cursor-not-allowed'
                             )}
+                            disabled={isRecurring}
                           >
                             {field.value ? (
                               format(field.value, 'PPP')
@@ -222,6 +255,97 @@ export default function TaskForm({
                   </FormItem>
                 )}
               />
+
+            <FormField
+              control={form.control}
+              name="isRecurring"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel>Recurring / Goal</FormLabel>
+                    <DialogDescription>Is this a recurring task with a goal?</DialogDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            {isRecurring && (
+                <div className="space-y-4 rounded-lg border p-3 shadow-sm">
+                    <FormField
+                      control={form.control}
+                      name="recurrence"
+                      render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Repeats</FormLabel>
+                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a recurrence" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    <SelectItem value="daily">Daily</SelectItem>
+                                    <SelectItem value="weekly">Weekly</SelectItem>
+                                    <SelectItem value="monthly">Monthly</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="goalType"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Goal Type</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                        <SelectTrigger>
+                                        <SelectValue placeholder="Select a goal type" />
+                                        </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="count">Count</SelectItem>
+                                            <SelectItem value="amount">Amount</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="goalTarget"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Target</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="e.g. 10" {...field} />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                     <FormField
+                        control={form.control}
+                        name="goalUnit"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Unit (optional)</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g. km, articles, hours" {...field} />
+                                </FormControl>
+                            </FormItem>
+                        )}
+                    />
+                </div>
+            )}
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit">{task ? 'Save Changes' : 'Create Task'}</Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import type { Task, Project, Filters } from '@/types';
+import type { Task, Project, Filters, ProgressLog } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,7 +19,7 @@ import { TaskZenIcon } from '@/components/icons';
 import ProjectList from '@/components/project-list';
 import TaskItem from '@/components/task-item';
 import TaskForm from '@/components/task-form';
-import { Separator } from '@/components/ui/separator';
+import ProgressLogDialog from '@/components/progress-log-dialog';
 import {
   Sheet,
   SheetContent,
@@ -30,6 +30,7 @@ const initialProjects: Project[] = [
   { id: '1', name: 'Website Redesign' },
   { id: '2', name: 'Marketing Campaign' },
   { id: '3', name: 'Personal' },
+  { id: '4', name: 'Health & Fitness' },
 ];
 
 const initialTasks: Task[] = [
@@ -39,6 +40,8 @@ const initialTasks: Task[] = [
   { id: 't4', projectId: '2', title: 'Draft ad copy', description: 'Write compelling copy for the new social media ads.', completed: false, dueDate: new Date(new Date().setDate(new Date().getDate() + 2)), tags: ['copywriting'] },
   { id: 't5', projectId: '3', title: 'Buy groceries', completed: false, description: "Milk, bread, eggs, and cheese." },
   { id: 't6', projectId: '3', title: 'Schedule dentist appointment', completed: true, dueDate: new Date(new Date().setDate(new Date().getDate() - 10)) },
+  { id: 't7', projectId: '4', title: 'Run 10km this week', completed: false, recurrence: 'weekly', goal: { type: 'amount', target: 10, unit: 'km' }, progress: [{ date: '2024-07-28', value: 3.5 }, { date: '2024-07-29', value: 2.5 }] },
+  { id: 't8', projectId: '4', title: 'Read 5 articles', completed: false, recurrence: 'weekly', goal: { type: 'count', target: 5, unit: 'articles' }, progress: [{ date: '2024-07-28', value: 1 }, { date: '2024-07-29', value: 2 }] },
 ];
 
 export default function Home() {
@@ -48,6 +51,7 @@ export default function Home() {
   const [filters, setFilters] = useState<Filters>({ status: 'all', tag: '' });
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [loggingTask, setLoggingTask] = useState<Task | null>(null);
 
   useEffect(() => {
     setProjects(initialProjects);
@@ -64,12 +68,27 @@ export default function Home() {
     if (editingTask) {
       setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...editingTask, ...taskData } : t));
     } else {
-      const newTask: Task = { ...taskData, id: Date.now().toString(), completed: false };
+      const newTask: Task = { ...taskData, id: Date.now().toString(), completed: false, progress: taskData.goal ? [] : undefined };
       setTasks(prev => [newTask, ...prev]);
     }
     setEditingTask(null);
     setIsFormOpen(false);
   };
+  
+  const handleLogProgress = (taskId: string, log: ProgressLog) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      const existingLogIndex = t.progress?.findIndex(p => p.date === log.date);
+      let newProgress = [...(t.progress || [])];
+      if (existingLogIndex !== -1) {
+        newProgress[existingLogIndex] = log;
+      } else {
+        newProgress.push(log);
+      }
+      return { ...t, progress: newProgress };
+    }));
+    setLoggingTask(null);
+  }
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
@@ -81,7 +100,13 @@ export default function Home() {
   };
 
   const handleToggleTask = (taskId: string) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t));
+    setTasks(prev => prev.map(t => {
+       if (t.id === taskId) {
+         if (t.recurrence) return t; // Recurring tasks aren't "completed" in the same way
+         return { ...t, completed: !t.completed };
+       }
+       return t;
+    }));
   };
   
   const handleFormOpen = (isOpen: boolean) => {
@@ -190,6 +215,7 @@ export default function Home() {
                   onToggle={handleToggleTask}
                   onEdit={handleEditTask}
                   onDelete={handleDeleteTask}
+                  onLogProgress={() => setLoggingTask(task)}
                 />
               ))}
             </div>
@@ -214,6 +240,11 @@ export default function Home() {
         task={editingTask}
         projects={projects}
         defaultProjectId={selectedProjectId}
+      />
+      <ProgressLogDialog
+        task={loggingTask}
+        onOpenChange={() => setLoggingTask(null)}
+        onLogProgress={handleLogProgress}
       />
     </div>
   );

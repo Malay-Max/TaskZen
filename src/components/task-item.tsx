@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -17,7 +18,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Calendar as CalendarIcon, Pencil, Trash2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { MoreVertical, Calendar as CalendarIcon, Pencil, Trash2, PlusCircle, Repeat } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/types';
@@ -27,10 +29,11 @@ interface TaskItemProps {
   onToggle: (id: string) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
+  onLogProgress: (task: Task) => void;
 }
 
-export default function TaskItem({ task, onToggle, onEdit, onDelete }: TaskItemProps) {
-  const { id, title, description, completed, dueDate, tags } = task;
+export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgress }: TaskItemProps) {
+  const { id, title, description, completed, dueDate, tags, recurrence, goal, progress } = task;
 
   const dueDateStatus = dueDate
     ? isPast(dueDate) && !isToday(dueDate)
@@ -39,19 +42,36 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete }: TaskItemP
       ? 'due-today'
       : 'upcoming'
     : 'none';
+    
+  const currentProgress = useMemo(() => {
+    if (!progress) return 0;
+    return progress.reduce((acc, log) => acc + log.value, 0);
+  }, [progress]);
+
+  const progressPercentage = useMemo(() => {
+    if (!goal || !goal.target) return 0;
+    return (currentProgress / goal.target) * 100;
+  }, [currentProgress, goal]);
 
   return (
     <Card className={cn(
         "flex flex-col transition-all hover:shadow-md", 
         completed ? "bg-card/60" : "bg-card"
     )}>
-      <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-4">
-        <Checkbox
-          id={`task-${id}`}
-          checked={completed}
-          onCheckedChange={() => onToggle(id)}
-          className="mt-1 shrink-0"
-        />
+      <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-2">
+        {!recurrence && (
+          <Checkbox
+            id={`task-${id}`}
+            checked={completed}
+            onCheckedChange={() => onToggle(id)}
+            className="mt-1 shrink-0"
+          />
+        )}
+        {recurrence && (
+            <div className="mt-1 shrink-0">
+                <Repeat className="w-4 h-4 text-muted-foreground" />
+            </div>
+        )}
         <div className="flex-1">
           <CardTitle
             className={cn(
@@ -69,6 +89,12 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete }: TaskItemP
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {goal && (
+              <DropdownMenuItem onClick={() => onLogProgress(task)}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  <span>Log Progress</span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onEdit(task)}>
               <Pencil className="mr-2 h-4 w-4" />
               <span>Edit</span>
@@ -81,19 +107,28 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete }: TaskItemP
         </DropdownMenu>
       </CardHeader>
 
-      {description && (
-        <CardContent className="pt-0 pb-4 flex-1">
+      <CardContent className="pt-0 pb-4 flex-1 space-y-4">
+        {description && (
           <p className={cn(
             "text-sm text-muted-foreground",
             completed && "line-through"
           )}>
             {description}
           </p>
-        </CardContent>
-      )}
+        )}
+        {goal && (
+            <div className="space-y-2">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Progress</span>
+                    <span>{currentProgress.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit || ''}</span>
+                </div>
+                <Progress value={progressPercentage} />
+            </div>
+        )}
+      </CardContent>
 
       <CardFooter className="flex flex-wrap items-center gap-2 pt-2">
-        {dueDate && (
+        {dueDate && !recurrence && (
           <Badge
             variant="outline"
             className={cn({
@@ -104,6 +139,12 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete }: TaskItemP
             <CalendarIcon className="mr-1.5 h-3 w-3" />
             {format(dueDate, 'MMM d')}
           </Badge>
+        )}
+        {recurrence && (
+            <Badge variant="outline">
+                <Repeat className="mr-1.5 h-3 w-3" />
+                {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
+            </Badge>
         )}
         {tags?.map((tag) => (
           <Badge key={tag} variant="secondary">

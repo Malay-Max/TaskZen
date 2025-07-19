@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
@@ -32,12 +33,12 @@ export default function RootLayout({
                  </Link>
                  <nav className="flex flex-col items-center gap-4">
                      <Button variant="ghost" size="icon" asChild>
-                         <Link href="/" title="Tasks">
+                         <Link href="/tasks" title="Tasks">
                              <ListTodo className="h-5 w-5" />
                          </Link>
                      </Button>
                      <Button variant="ghost" size="icon" asChild>
-                         <Link href="/dashboard" title="Dashboard">
+                         <Link href="/" title="Dashboard">
                              <LayoutGrid className="h-5 w-5" />
                          </Link>
                      </Button>

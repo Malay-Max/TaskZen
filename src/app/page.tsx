@@ -1,271 +1,126 @@
 
+// src/app/page.tsx
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
-import type { Task, Project, Filters, ProgressLog, Tag } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  PlusCircle,
-  LayoutGrid,
-} from 'lucide-react';
-import { TaskZenIcon } from '@/components/icons';
-import ProjectList from '@/components/project-list';
-import TaskItem from '@/components/task-item';
-import TaskForm from '@/components/task-form';
-import ProgressLogDialog from '@/components/progress-log-dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { useMemo } from 'react';
 import { useCollection } from '@/hooks/use-collection';
-import {
-  addProject,
-  addTask,
-  updateTask,
-  deleteTask,
-  logProgress,
-} from '@/lib/firebase';
-import { useToast } from "@/hooks/use-toast";
+import type { Task, Project } from '@/types';
+import { subDays, startOfDay, isAfter } from 'date-fns';
+import { Loader2 } from 'lucide-react';
 
+import StatCard from '@/components/dashboard/stat-card';
+import TasksCompletedChart from '@/components/dashboard/tasks-completed-chart';
+import ProjectDistributionChart from '@/components/dashboard/project-distribution-chart';
+import GoalProgress from '@/components/dashboard/goal-progress';
+import UpcomingTasks from '@/components/dashboard/upcoming-tasks';
 
-export default function Home() {
-  const { data: projects, loading: projectsLoading } = useCollection<Project>('projects');
+export default function DashboardPage() {
   const { data: tasks, loading: tasksLoading, error: tasksError } = useCollection<Task>('tasks');
-  const { data: allTags, loading: tagsLoading } = useCollection<Tag>('tags');
-
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>({ status: 'all', tag: '' });
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [loggingTask, setLoggingTask] = useState<Task | null>(null);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    // Select the first project by default when projects load
-    if (!selectedProjectId && projects && projects.length > 0) {
-      setSelectedProjectId(projects[0].id);
-    }
-  }, [projects, selectedProjectId]);
-
-
-  const handleAddProject = async (name: string) => {
-    try {
-      await addProject({ name });
-    } catch (error) {
-      toast({ variant: 'destructive', title: "Error adding project." });
-      console.error(error);
-    }
-  };
-
-  const handleTaskSubmit = async (taskData: any) => {
-    try {
-      if (editingTask) {
-        await updateTask(editingTask.id, taskData);
-        toast({ title: "Task updated!" });
-      } else {
-        await addTask({ ...taskData, completed: false });
-        toast({ title: "Task added!" });
-      }
-      setEditingTask(null);
-      setIsFormOpen(false);
-    } catch (error) {
-       toast({ variant: 'destructive', title: "Error saving task." });
-       console.error(error);
-    }
-  };
+  const { data: projects, loading: projectsLoading, error: projectsError } = useCollection<Project>('projects');
   
-  const handleLogProgress = async (taskId: string, log: ProgressLog) => {
-    try {
-        await logProgress(taskId, log);
-        setLoggingTask(null);
-        toast({ title: "Progress logged!" });
-    } catch (error) {
-        toast({ variant: 'destructive', title: "Error logging progress." });
-        console.error(error);
+  const loading = tasksLoading || projectsLoading;
+  const error = tasksError || projectsError;
+
+  const dashboardData = useMemo(() => {
+    if (loading || error || !tasks || !projects) {
+      return null;
     }
+
+    // --- Key Metrics ---
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(t => t.completed).length;
+    const activeTasks = totalTasks - completedTasks;
+    const goalTasks = tasks.filter(t => !!t.goal);
+
+    // --- Tasks Completed Chart Data (Last 7 Days) ---
+    const last7Days = Array.from({ length: 7 }, (_, i) => startOfDay(subDays(new Date(), i))).reverse();
+    const tasksCompletedLast7Days = last7Days.map(day => {
+      const completedOnDay = tasks.filter(task => 
+        task.completed && 
+        task.updatedAt &&
+        startOfDay(new Date(task.updatedAt)).getTime() === day.getTime()
+      ).length;
+      return {
+        date: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        completed: completedOnDay,
+      };
+    });
+
+    // --- Project Distribution Chart Data ---
+    const tasksByProject = projects.map(project => ({
+      name: project.name,
+      value: tasks.filter(t => t.projectId === project.id).length,
+    })).filter(p => p.value > 0);
+
+    // --- Upcoming & Overdue Tasks ---
+    const now = startOfDay(new Date());
+    const upcomingTasks = tasks.filter(task => 
+      !task.completed && 
+      task.dueDate && 
+      isAfter(startOfDay(new Date(task.dueDate)), now)
+    ).sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+    
+    return {
+      totalTasks,
+      completedTasks,
+      activeTasks,
+      goalTasks,
+      tasksCompletedLast7Days,
+      tasksByProject,
+      upcomingTasks,
+    };
+  }, [tasks, projects, loading, error]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="ml-4">Loading dashboard...</p>
+      </div>
+    );
   }
 
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task);
-    setIsFormOpen(true);
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-     if (window.confirm("Are you sure you want to delete this task?")) {
-        try {
-            await deleteTask(taskId);
-            toast({ title: "Task deleted." });
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Error deleting task." });
-            console.error(error);
-        }
-    }
-  };
-
-  const handleToggleTask = async (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-
-    // Prevent toggling recurring tasks
-    if (task.recurrence) return;
-
-    try {
-        await updateTask(taskId, { completed: !task.completed });
-    } catch (error) {
-        toast({ variant: 'destructive', title: "Error updating task status." });
-        console.error(error);
-    }
-  };
-  
-  const handleFormOpen = (isOpen: boolean) => {
-    if (!isOpen) {
-      setEditingTask(null);
-    }
-    setIsFormOpen(isOpen);
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full text-red-500">
+        <p>Error loading dashboard data: {error.message}</p>
+      </div>
+    );
   }
-
-  const filteredTasks = useMemo(() => {
-    return (tasks || [])
-      .filter(task => selectedProjectId ? task.projectId === selectedProjectId : true)
-      .filter(task => filters.status === 'all' ? true : filters.status === 'completed' ? task.completed : !task.completed)
-      .filter(task => filters.tag ? task.tags?.some(t => t.name === filters.tag) : true);
-  }, [tasks, selectedProjectId, filters]);
-
-  const selectedProject = useMemo(() => projects?.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
-
-  const availableTags = useMemo(() => {
-    if (!allTags) return [];
-    return allTags.map(t => t.name);
-  }, [allTags]);
-
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      <div className="p-4 flex items-center gap-2 border-b">
-        <TaskZenIcon />
-        <h1 className="text-xl font-bold">TaskZen</h1>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <ProjectList
-          projects={projects || []}
-          selectedProjectId={selectedProjectId}
-          onSelectProject={setSelectedProjectId}
-          onAddProject={handleAddProject}
-          loading={projectsLoading}
-        />
-      </div>
-      <div className="p-2 border-t">
-        <p className="text-xs text-muted-foreground text-center">© 2024 TaskZen</p>
-      </div>
-    </div>
-  );
+  
+  if (!dashboardData) {
+      return (
+        <div className="flex items-center justify-center h-full">
+            <p>No data available to display.</p>
+        </div>
+      )
+  }
 
   return (
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between p-4 border-b shrink-0">
-           <div className="flex items-center gap-4">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <LayoutGrid className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-72">
-                 <SidebarContent />
-              </SheetContent>
-            </Sheet>
-            <div>
-              <h2 className="text-2xl font-bold">{selectedProject?.name || "All Tasks"}</h2>
-              <p className="text-sm text-muted-foreground">{filteredTasks.length} tasks</p>
-            </div>
-          </div>
-          <Button onClick={() => setIsFormOpen(true)} disabled={projectsLoading || !projects || projects.length === 0}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Task
-          </Button>
-        </header>
-
-        <div className="p-4 flex flex-col md:flex-row gap-4 items-center border-b shrink-0">
-          <Input 
-            placeholder="Filter by tag..."
-            className="max-w-xs"
-            value={filters.tag}
-            onChange={(e) => setFilters(prev => ({ ...prev, tag: e.target.value }))}
-          />
-          <Select
-            value={filters.status}
-            onValueChange={(value) => setFilters(prev => ({ ...prev, status: value as Filters['status'] }))}
-          >
-            <SelectTrigger className="w-full md:w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="incomplete">Incomplete</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex-1" />
-          {!tagsLoading && availableTags.length > 0 && <span className="text-sm text-muted-foreground hidden lg:block">Available tags: {availableTags.join(', ')}</span>}
-
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard title="Total Tasks" value={dashboardData.totalTasks} />
+        <StatCard title="Active Tasks" value={dashboardData.activeTasks} />
+        <StatCard title="Completed Tasks" value={dashboardData.completedTasks} />
+        <StatCard title="Active Goals" value={dashboardData.goalTasks.length} />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <div className="col-span-12 md:col-span-4">
+            <TasksCompletedChart data={dashboardData.tasksCompletedLast7Days} />
         </div>
-
-        <div className="flex-1 overflow-y-auto p-4">
-          {tasksLoading ? (
-             <div className="flex items-center justify-center h-full">
-                <p>Loading tasks...</p>
-             </div>
-          ) : tasksError ? (
-            <div className="flex items-center justify-center h-full text-red-500">
-                <p>Error: {tasksError.message}</p>
-             </div>
-          ): filteredTasks.length > 0 ? (
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {filteredTasks.map(task => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  onToggle={handleToggleTask}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  onLogProgress={() => setLoggingTask(task)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <h3 className="text-xl font-semibold">No tasks here!</h3>
-              <p className="text-muted-foreground mt-2">
-                {selectedProjectId ? "This project is empty." : "You have no tasks."}
-              </p>
-              <Button className="mt-4" onClick={() => setIsFormOpen(true)} disabled={projectsLoading || !projects || projects.length === 0}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Task
-              </Button>
-            </div>
-          )}
+        <div className="col-span-12 md:col-span-3">
+            <ProjectDistributionChart data={dashboardData.tasksByProject} />
         </div>
-      
-
-      <TaskForm
-        open={isFormOpen}
-        onOpenChange={handleFormOpen}
-        onSubmit={handleTaskSubmit}
-        task={editingTask}
-        projects={projects || []}
-        defaultProjectId={selectedProjectId}
-      />
-      <ProgressLogDialog
-        task={loggingTask}
-        onOpenChange={() => setLoggingTask(null)}
-        onLogProgress={handleLogProgress}
-      />
-    </main>
+      </div>
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        <div className="col-span-12 md:col-span-4">
+            <GoalProgress tasks={dashboardData.goalTasks} />
+        </div>
+        <div className="col-span-12 md:col-span-3">
+           <UpcomingTasks tasks={dashboardData.upcomingTasks} />
+        </div>
+       </div>
+    </div>
   );
 }

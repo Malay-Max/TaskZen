@@ -6,7 +6,6 @@ import { TaskZenIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { LayoutGrid, ListTodo } from 'lucide-react';
-import ReminderSystem from '@/components/reminder-system';
 
 export const metadata: Metadata = {
   title: 'TaskZen',
@@ -50,7 +49,6 @@ export default function RootLayout({
             </div>
          </div>
         <Toaster />
-        <ReminderSystem />
       </body>
     </html>
   );

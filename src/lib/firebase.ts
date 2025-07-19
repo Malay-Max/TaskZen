@@ -178,12 +178,17 @@ export async function fetchTasksWithTags(): Promise<Task[]> {
 
   const tasks: Task[] = tasksSnapshot.docs.map(doc => {
     const data = doc.data();
+    // Handle pending server timestamps
+    const now = new Date();
+    const createdAt = data.createdAt instanceof Timestamp ? data.createdAt.toDate() : now;
+    const updatedAt = data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : now;
+
     return {
       id: doc.id,
       ...data,
       dueDate: data.dueDate ? (data.dueDate as Timestamp).toDate() : null,
-      createdAt: (data.createdAt as Timestamp).toDate(),
-      updatedAt: (data.updatedAt as Timestamp).toDate(),
+      createdAt,
+      updatedAt,
       tagIds: data.tagIds || [],
       tags: [], // Start with empty tags, to be populated
     } as Task;
@@ -192,10 +197,21 @@ export async function fetchTasksWithTags(): Promise<Task[]> {
   const allTagIds = [...new Set(tasks.flatMap(t => t.tagIds))];
 
   if (allTagIds.length > 0) {
-      const tagsQuery = query(tagsCollection, where(documentId(), 'in', allTagIds));
-      const tagsSnapshot = await getDocs(tagsQuery);
+      // Chunk tag IDs to avoid exceeding Firestore's 'in' query limit (max 30)
+      const tagChunks: string[][] = [];
+      for (let i = 0; i < allTagIds.length; i += 30) {
+        tagChunks.push(allTagIds.slice(i, i + 30));
+      }
+      
       const tagsMap = new Map<string, Tag>();
-      tagsSnapshot.forEach(doc => tagsMap.set(doc.id, { id: doc.id, ...doc.data() } as Tag));
+      
+      for (const chunk of tagChunks) {
+        if(chunk.length > 0) {
+            const tagsQuery = query(tagsCollection, where(documentId(), 'in', chunk));
+            const tagsSnapshot = await getDocs(tagsQuery);
+            tagsSnapshot.forEach(doc => tagsMap.set(doc.id, { id: doc.id, ...doc.data() } as Tag));
+        }
+      }
   
       // Map tags back to their tasks
       tasks.forEach(task => {

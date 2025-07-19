@@ -1,10 +1,10 @@
 # TaskZen on Firebase Studio
 
-This is a Next.js task management application built in Firebase Studio. It uses Firebase Firestore for real-time data persistence.
+This is a Next.js task management application built in Firebase Studio. It uses Firebase Firestore for real-time data persistence and Google AI for smart task generation.
 
 ## Getting Started
 
-To run this project locally, you'll need to set up a Firebase project and configure the app to use it.
+To run this project locally, you'll need to set up a Firebase project and a Google AI API key, then configure the app to use them.
 
 ### 1. Set up a Firebase Project
 
@@ -17,17 +17,24 @@ To run this project locally, you'll need to set up a Firebase project and config
 7.  In the Firebase console, go to the **Firestore Database** section.
 8.  Click **"Create database"** and start in **test mode** for now. This will allow open read/write access for development. *For production, you should set up proper security rules.*
 
-### 2. Configure Environment Variables
+### 2. Get a Google AI (Gemini) API Key
+
+1. Go to the [Google AI Studio](https://aistudio.google.com/).
+2. Sign in with your Google account.
+3. Click the **"Get API key"** button and then **"Create API key in new project"**.
+4. Copy the generated API key.
+
+### 3. Configure Environment Variables
 
 1.  In the root of your project, create a new file named `.env.local`.
 2.  Copy the contents of `.env.local.example` into your new `.env.local` file.
-3.  Replace the placeholder values with the actual credentials from your Firebase project's web app configuration (from step 1.6).
+3.  Replace the placeholder values with the actual credentials from your Firebase project's web app configuration (from step 1.6) and your Gemini API Key (from step 2.4).
 
-### 3. Install Dependencies and Run
+### 4. Install Dependencies and Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Your app should now be running locally, connected to your Firebase Firestore database!
+Your app should now be running locally, connected to your Firebase Firestore database and Google AI!

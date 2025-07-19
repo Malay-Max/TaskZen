@@ -11,6 +11,7 @@ import {
   writeBatch,
   arrayUnion,
   getDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import type { Task, Project, ProgressLog } from '@/types';
 import { format } from 'date-fns';
@@ -50,6 +51,7 @@ type AddTaskData = Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'progress'> & {
 export const addTask = async (task: AddTaskData) => {
   const newTask = {
     ...task,
+    dueDate: task.dueDate ? Timestamp.fromDate(task.dueDate) : null,
     progress: task.goal ? [] : null, // Initialize progress if it's a goal task
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -59,8 +61,14 @@ export const addTask = async (task: AddTaskData) => {
 
 export const updateTask = async (taskId: string, task: Partial<Omit<Task, 'id'>>) => {
   const taskRef = doc(db, 'tasks', taskId);
+  const dataToUpdate: { [key: string]: any } = { ...task };
+  
+  if (task.dueDate) {
+    dataToUpdate.dueDate = Timestamp.fromDate(task.dueDate);
+  }
+
   return updateDoc(taskRef, {
-    ...task,
+    ...dataToUpdate,
     updatedAt: serverTimestamp(),
   });
 };
@@ -79,20 +87,21 @@ export const logProgress = async (taskId: string, log: ProgressLog) => {
     throw new Error("Task not found!");
   }
 
-  const taskData = taskDoc.data() as Task;
-  const progress: ProgressLog[] = taskData.progress || [];
+  const taskData = taskDoc.data();
+  // Ensure progress is an array, converting from Firestore Timestamps if necessary
+  const progress: ProgressLog[] = (taskData.progress || []).map((p: any) => ({
+      ...p,
+      date: p.date instanceof Timestamp ? format(p.date.toDate(), 'yyyy-MM-dd') : p.date
+  }));
 
-  const logDate = format(new Date(log.date), 'yyyy-MM-dd');
+  const logDate = log.date; // Already in YYYY-MM-DD format
 
   const existingLogIndex = progress.findIndex(p => p.date === logDate);
 
   const batch = writeBatch(db);
 
   if (existingLogIndex !== -1) {
-    // If a log for today exists, we can't just update the array element directly.
-    // We need to remove the old one and add the new one.
-    // A more complex approach would be to get the whole array, modify it, and set it back.
-    // For simplicity, we'll overwrite the whole array.
+    // If a log for today exists, we overwrite the whole array.
     const newProgress = [...progress];
     newProgress[existingLogIndex] = { ...log, date: logDate };
     batch.update(taskRef, { progress: newProgress, updatedAt: serverTimestamp() });

@@ -65,10 +65,19 @@ const extractTaskFlow = ai.defineFlow(
     outputSchema: ExtractTaskFromUrlOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    if (!output) {
-      throw new Error("Failed to extract task from URL.");
+    try {
+      const { output } = await prompt(input);
+      if (!output) {
+        throw new Error("The AI model did not return any output.");
+      }
+      return output;
+    } catch (error: any) {
+        if (error.message && error.message.includes('HTTP error downloading media')) {
+            console.error('Blocked by source:', error.message);
+            throw new Error(`Failed to access the URL. The website may be blocking automated access. Please try a different link or enter the task manually.`);
+        }
+        console.error('An unexpected error occurred during task extraction:', error);
+        throw new Error("An unexpected error occurred while trying to extract the task.");
     }
-    return output;
   }
 );

@@ -89,12 +89,6 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {goal && (
-              <DropdownMenuItem onClick={() => onLogProgress(task)}>
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  <span>Log Progress</span>
-              </DropdownMenuItem>
-            )}
             <DropdownMenuItem onClick={() => onEdit(task)}>
               <Pencil className="mr-2 h-4 w-4" />
               <span>Edit</span>
@@ -128,29 +122,37 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
       </CardContent>
 
       <CardFooter className="flex flex-wrap items-center gap-2 pt-2">
-        {dueDate && !recurrence && (
-          <Badge
-            variant="outline"
-            className={cn({
-              'text-red-600 border-red-600/50 dark:text-red-400 dark:border-red-400/50': dueDateStatus === 'overdue' && !completed,
-              'text-amber-600 border-amber-600/50 dark:text-amber-400 dark:border-amber-400/50': dueDateStatus === 'due-today' && !completed,
-            })}
-          >
-            <CalendarIcon className="mr-1.5 h-3 w-3" />
-            {format(dueDate, 'MMM d')}
-          </Badge>
+        <div className="flex-1 flex flex-wrap gap-2">
+            {dueDate && !recurrence && (
+              <Badge
+                variant="outline"
+                className={cn({
+                  'text-red-600 border-red-600/50 dark:text-red-400 dark:border-red-400/50': dueDateStatus === 'overdue' && !completed,
+                  'text-amber-600 border-amber-600/50 dark:text-amber-400 dark:border-amber-400/50': dueDateStatus === 'due-today' && !completed,
+                })}
+              >
+                <CalendarIcon className="mr-1.5 h-3 w-3" />
+                {format(dueDate, 'MMM d')}
+              </Badge>
+            )}
+            {recurrence && (
+                <Badge variant="outline">
+                    <Repeat className="mr-1.5 h-3 w-3" />
+                    {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
+                </Badge>
+            )}
+            {tags?.map((tag) => (
+              <Badge key={tag} variant="secondary">
+                {tag}
+              </Badge>
+            ))}
+        </div>
+        {goal && (
+          <Button variant="outline" size="sm" onClick={() => onLogProgress(task)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Log
+          </Button>
         )}
-        {recurrence && (
-            <Badge variant="outline">
-                <Repeat className="mr-1.5 h-3 w-3" />
-                {recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}
-            </Badge>
-        )}
-        {tags?.map((tag) => (
-          <Badge key={tag} variant="secondary">
-            {tag}
-          </Badge>
-        ))}
       </CardFooter>
     </Card>
   );

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from 'react';
@@ -96,6 +97,10 @@ export default function TaskForm({
       dueDate: null,
       tags: '',
       isRecurring: false,
+      recurrence: undefined,
+      goalType: undefined,
+      goalTarget: undefined,
+      goalUnit: '',
     },
   });
 
@@ -345,7 +350,7 @@ export default function TaskForm({
                                 <FormItem>
                                     <FormLabel>Target</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="e.g. 10" {...field} onChange={event => field.onChange(+event.target.value)} />
+                                        <Input type="number" placeholder="e.g. 10" {...field} value={field.value ?? ''} onChange={event => field.onChange(+event.target.value)} />
                                     </FormControl>
                                 </FormItem>
                             )}

@@ -18,6 +18,18 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+        // Fixes npm packages that depend on `fs` module
+        config.resolve.fallback = {
+            ...config.resolve.fallback,
+            fs: false
+        };
+    }
+    config.externals.push('node-fetch');
+
+    return config;
+  },
 };
 
 export default nextConfig;

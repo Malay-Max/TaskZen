@@ -1,10 +1,10 @@
 # TaskZen on Firebase Studio
 
-This is a Next.js task management application built in Firebase Studio. It uses Firebase Firestore for real-time data persistence and Google AI for smart task generation.
+This is a Next.js task management application built in Firebase Studio. It uses Firebase Firestore for real-time data persistence and sends task reminders via Telegram.
 
 ## Getting Started
 
-To run this project locally, you'll need to set up a Firebase project and a Google AI API key, then configure the app to use them.
+To run this project locally, you'll need to set up a Firebase project and a Telegram Bot, then configure the app to use them.
 
 ### 1. Set up a Firebase Project
 
@@ -17,18 +17,17 @@ To run this project locally, you'll need to set up a Firebase project and a Goog
 7.  In the Firebase console, go to the **Firestore Database** section.
 8.  Click **"Create database"** and start in **test mode** for now. This will allow open read/write access for development. *For production, you should set up proper security rules.*
 
-### 2. Get a Google AI (Gemini) API Key
+### 2. Set up a Telegram Bot for Reminders
 
-1. Go to the [Google AI Studio](https://aistudio.google.com/).
-2. Sign in with your Google account.
-3. Click the **"Get API key"** button and then **"Create API key in new project"**.
-4. Copy the generated API key.
+1.  **Create a Bot**: Open Telegram and search for the **"BotFather"**. Start a chat with him and follow the instructions to create a new bot (`/newbot` command). He will give you a **Bot Token**.
+2.  **Get your Chat ID**: Search for your newly created bot in Telegram and send it a message (any message will do). Then, open your web browser and go to the following URL, replacing `<BOT_TOKEN>` with the token you just received: `https://api.telegram.org/bot<BOT_TOKEN>/getUpdates`.
+3.  Look for the JSON response. Inside `result[0].message.chat`, you will find your `id`. This is your **Chat ID**.
 
 ### 3. Configure Environment Variables
 
-1.  In the root of your project, create a new file named `.env.local`.
-2.  Copy the contents of `.env.local.example` into your new `.env.local` file.
-3.  Replace the placeholder values with the actual credentials from your Firebase project's web app configuration (from step 1.6) and your Gemini API Key (from step 2.4).
+1.  In the root of your project, create a new file named `.env.local` if it doesn't exist.
+2.  Copy the contents of `.env` into your new `.env.local` file.
+3.  Replace the placeholder values with your Firebase credentials (from step 1.6), and your Telegram Bot Token and Chat ID (from step 2).
 
 ### 4. Install Dependencies and Run
 
@@ -37,4 +36,13 @@ npm install
 npm run dev
 ```
 
-Your app should now be running locally, connected to your Firebase Firestore database and Google AI!
+Your app should now be running locally, connected to your Firebase Firestore database and ready to send Telegram reminders!
+
+### How Reminders Work
+
+The application checks for tasks that need reminders every minute *while the app is open in a browser tab*. This includes:
+-   Tasks that are due within the next hour.
+-   Tasks that are overdue.
+-   Daily recurring tasks that have not had progress logged by 7 PM local time.
+
+For a production environment, you would want to move this reminder logic to a server-side cron job (e.g., using Firebase Functions or Vercel Cron Jobs) to ensure reminders are sent even when the app is closed.

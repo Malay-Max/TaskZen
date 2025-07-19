@@ -54,7 +54,7 @@ From the content at the URL, extract the following information:
     *   Extract the **goalUnit** if specified (e.g., "articles", "km", "$").
     *   If the task is not recurring or has no clear goal, omit all these fields.
 
-Analyze the content at the following URL: {{{url}}}`,
+Analyze the content at the following URL: {{url url}}`,
 });
 
 const extractTaskFlow = ai.defineFlow(

@@ -1,13 +1,14 @@
 
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -39,9 +40,13 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { CalendarIcon, Loader2 } from 'lucide-react';
 import type { Task, Project } from '@/types';
+import { extractTaskFromUrl, type ExtractTaskFromUrlOutput } from '@/ai/flows/extract-task-from-url';
+import { useToast } from '@/hooks/use-toast';
+import { GenerateTaskIcon } from '@/components/icons';
+
 
 // Omit properties that are auto-generated or handled separately
 type TaskSubmitData = Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt' | 'progress' | 'tags' | 'tagIds'> & { tags: string[] };
@@ -88,6 +93,10 @@ export default function TaskForm({
   projects,
   defaultProjectId,
 }: TaskFormProps) {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [url, setUrl] = useState('');
+  const { toast } = useToast();
+
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -106,19 +115,19 @@ export default function TaskForm({
 
   const isRecurring = form.watch('isRecurring');
 
-  useEffect(() => {
-    if (task) {
+  const resetForm = (taskToReset?: Task | null) => {
+    if (taskToReset) {
       form.reset({
-        title: task.title,
-        description: task.description || '',
-        projectId: task.projectId,
-        dueDate: task.dueDate || null,
-        tags: task.tags?.map(t => t.name).join(', ') || '',
-        isRecurring: !!task.recurrence,
-        recurrence: task.recurrence || undefined,
-        goalType: task.goal?.type || undefined,
-        goalTarget: task.goal?.target || undefined,
-        goalUnit: task.goal?.unit || '',
+        title: taskToReset.title,
+        description: taskToReset.description || '',
+        projectId: taskToReset.projectId,
+        dueDate: taskToReset.dueDate || null,
+        tags: taskToReset.tags?.map(t => t.name).join(', ') || '',
+        isRecurring: !!taskToReset.recurrence,
+        recurrence: taskToReset.recurrence || undefined,
+        goalType: taskToReset.goal?.type || undefined,
+        goalTarget: taskToReset.goal?.target || undefined,
+        goalUnit: taskToReset.goal?.unit || '',
       });
     } else {
       form.reset({
@@ -134,7 +143,14 @@ export default function TaskForm({
         goalUnit: '',
       });
     }
-  }, [task, open, defaultProjectId, form, projects]);
+  };
+
+  useEffect(() => {
+    if (open) {
+      resetForm(task);
+      setUrl('');
+    }
+  }, [task, open, defaultProjectId, projects]);
   
   // When isRecurring is toggled, clear dependent fields
   useEffect(() => {
@@ -150,6 +166,55 @@ export default function TaskForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecurring]);
 
+  const handleGenerateTask = async () => {
+    if (!url) return;
+    setIsGenerating(true);
+    try {
+      const result = await extractTaskFromUrl({ url });
+      
+      // Populate form with AI results
+      form.setValue('title', result.title);
+      form.setValue('description', result.description);
+
+      if (result.dueDate) {
+        try {
+          form.setValue('dueDate', parseISO(result.dueDate));
+        } catch (e) {
+          console.error("Invalid date from AI", e);
+          form.setValue('dueDate', null);
+        }
+      } else {
+        form.setValue('dueDate', null);
+      }
+      
+      const existingTags = form.getValues('tags') || '';
+      const newTags = ['ai', ...result.tags];
+      const combinedTags = [...new Set([...existingTags.split(',').map(t => t.trim()), ...newTags])].filter(Boolean).join(', ');
+      form.setValue('tags', combinedTags);
+
+      if (result.recurrence && result.goalType && result.goalTarget) {
+        form.setValue('isRecurring', true);
+        form.setValue('recurrence', result.recurrence);
+        form.setValue('goalType', result.goalType);
+        form.setValue('goalTarget', result.goalTarget);
+        form.setValue('goalUnit', result.goalUnit);
+      } else {
+        form.setValue('isRecurring', false);
+      }
+
+    } catch (error) {
+      console.error('Failed to generate task:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Task Generation Failed',
+        description: 'Could not extract task details from the URL.',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+
   const handleSubmit = (data: TaskFormValues) => {
     const { isRecurring, goalType, goalTarget, goalUnit, ...rest } = data;
     const processedData = {
@@ -164,13 +229,34 @@ export default function TaskForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{task ? 'Edit Task' : 'Add New Task'}</DialogTitle>
           <DialogDescription>
-            {task ? 'Update the details of your task.' : 'Fill in the details for your new task.'}
+            {task ? 'Update the details of your task.' : 'Fill in the details or generate from a URL.'}
           </DialogDescription>
         </DialogHeader>
+        {!task && (
+          <>
+            <div className="flex gap-2 items-center pt-2">
+              <Input
+                type="url"
+                placeholder="Paste a link (e.g., Twitter, blog post)..."
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={isGenerating}
+              />
+              <Button onClick={handleGenerateTask} disabled={isGenerating || !url} variant="outline" size="icon">
+                {isGenerating ? <Loader2 className="animate-spin" /> : <GenerateTaskIcon />}
+                 <span className="sr-only">Generate Task</span>
+              </Button>
+            </div>
+            <div className="relative py-2">
+              <Separator />
+              <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-background px-2 text-xs text-muted-foreground">OR</span>
+            </div>
+          </>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
@@ -193,7 +279,7 @@ export default function TaskForm({
                 <FormItem>
                   <FormLabel>Description (optional)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Add more details..." {...field} value={field.value || ''} />
+                    <Textarea placeholder="Add more details..." {...field} value={field.value || ''} rows={5}/>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

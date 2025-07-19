@@ -23,7 +23,7 @@ const ExtractTaskFromUrlOutputSchema = z.object({
   tags: z.array(z.string()).describe('An array of 1-3 relevant lowercase tags for the task. The "ai" tag is added automatically and should not be included here.'),
   recurrence: z.enum(['daily', 'weekly', 'monthly']).optional().describe('The recurrence pattern if the task is repetitive.'),
   goalType: z.enum(['count', 'amount']).optional().describe('The type of goal if it is a recurring task.'),
-  goalTarget: z.number().positive().optional().describe('The quantitative target for the goal.'),
+  goalTarget: z.number().optional().describe('The quantitative target for the goal.'),
   goalUnit: z.string().optional().describe('The unit for the goal target (e.g., "articles", "km", "$").'),
 });
 export type ExtractTaskFromUrlOutput = z.infer<typeof ExtractTaskFromUrlOutputSchema>;

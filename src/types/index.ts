@@ -1,19 +1,21 @@
 export type Task = {
   id: string;
   title: string;
-  description?: string;
-  dueDate?: Date | null;
+  description: string | null;
+  dueDate: Date | null;
   completed: boolean;
   projectId: string;
-  tags?: string[];
+  tags: string[] | null;
   // New fields for recurring & goal-oriented tasks
-  recurrence?: 'daily' | 'weekly' | 'monthly' | null;
-  goal?: {
+  recurrence: 'daily' | 'weekly' | 'monthly' | null;
+  goal: {
     type: 'count' | 'amount';
     target: number;
-    unit?: string;
+    unit: string | null;
   } | null;
-  progress?: ProgressLog[];
+  progress: ProgressLog[] | null;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type ProgressLog = {
@@ -24,6 +26,7 @@ export type ProgressLog = {
 export type Project = {
   id: string;
   name: string;
+  createdAt: Date;
 };
 
 export type Filters = {

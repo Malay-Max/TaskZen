@@ -11,6 +11,7 @@ interface ProjectListProps {
   selectedProjectId: string | null;
   onSelectProject: (id: string) => void;
   onAddProject: (name: string) => void;
+  loading: boolean;
 }
 
 export default function ProjectList({
@@ -18,6 +19,7 @@ export default function ProjectList({
   selectedProjectId,
   onSelectProject,
   onAddProject,
+  loading,
 }: ProjectListProps) {
   const [newProjectName, setNewProjectName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -33,6 +35,7 @@ export default function ProjectList({
   return (
     <div className="p-2 space-y-2">
       <nav className="space-y-1">
+        {loading && <p className="p-2 text-sm text-muted-foreground">Loading projects...</p>}
         {projects.map((project) => (
           <Button
             key={project.id}

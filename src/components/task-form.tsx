@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -42,9 +42,13 @@ import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import type { Task, Project } from '@/types';
 
+// Omit properties that are auto-generated or handled separately
+type TaskSubmitData = Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt' | 'progress'>;
+
+
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required.' }).max(100),
-  description: z.string().max(500).optional(),
+  description: z.string().max(500).optional().transform(val => val || null),
   projectId: z.string({ required_error: 'Please select a project.' }),
   dueDate: z.date().nullable().optional(),
   tags: z.string().optional(),
@@ -52,7 +56,7 @@ const formSchema = z.object({
   recurrence: z.enum(['daily', 'weekly', 'monthly']).optional(),
   goalType: z.enum(['count', 'amount']).optional(),
   goalTarget: z.coerce.number().positive().optional(),
-  goalUnit: z.string().optional(),
+  goalUnit: z.string().optional().transform(val => val || null),
 }).refine(data => {
     if (data.isRecurring) {
         return !!data.recurrence && !!data.goalType && !!data.goalTarget;
@@ -69,7 +73,7 @@ type TaskFormValues = z.infer<typeof formSchema>;
 interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: Omit<Task, 'id' | 'completed'>) => void;
+  onSubmit: (data: TaskSubmitData) => void;
   task?: Task | null;
   projects: Project[];
   defaultProjectId?: string | null;
@@ -126,14 +130,29 @@ export default function TaskForm({
       });
     }
   }, [task, open, defaultProjectId, form, projects]);
+  
+  // When isRecurring is toggled, clear dependent fields
+  useEffect(() => {
+    if (!isRecurring) {
+        form.setValue('dueDate', form.getValues('dueDate')); // keep due date
+        form.setValue('recurrence', undefined);
+        form.setValue('goalType', undefined);
+        form.setValue('goalTarget', undefined);
+        form.setValue('goalUnit', '');
+    } else {
+       form.setValue('dueDate', null); // Recurring tasks don't have a fixed due date
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRecurring]);
 
   const handleSubmit = (data: TaskFormValues) => {
     const { isRecurring, goalType, goalTarget, goalUnit, ...rest } = data;
-    const processedData = {
+    const processedData: TaskSubmitData = {
       ...rest,
       tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-      recurrence: isRecurring ? data.recurrence : null,
-      goal: isRecurring && goalType && goalTarget ? { type: goalType, target: goalTarget, unit: goalUnit } : null
+      // Set recurrence and goal to null if not a recurring task
+      recurrence: isRecurring ? data.recurrence! : null,
+      goal: isRecurring && goalType && goalTarget ? { type: goalType, target: goalTarget, unit: goalUnit || null } : null
     };
     onSubmit(processedData);
   };
@@ -167,9 +186,9 @@ export default function TaskForm({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>Description (optional)</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Add more details..." {...field} />
+                    <Textarea placeholder="Add more details..." {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -182,7 +201,7 @@ export default function TaskForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Project</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a project" />
@@ -247,7 +266,7 @@ export default function TaskForm({
                 name="tags"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tags</FormLabel>
+                    <FormLabel>Tags (comma-separated)</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. urgent, marketing, design" {...field} />
                     </FormControl>
@@ -282,7 +301,7 @@ export default function TaskForm({
                       render={({ field }) => (
                           <FormItem>
                             <FormLabel>Repeats</FormLabel>
-                             <Select onValueChange={field.onChange} defaultValue={field.value}>
+                             <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select a recurrence" />
@@ -305,7 +324,7 @@ export default function TaskForm({
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Goal Type</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                         <SelectTrigger>
                                         <SelectValue placeholder="Select a goal type" />
@@ -326,7 +345,7 @@ export default function TaskForm({
                                 <FormItem>
                                     <FormLabel>Target</FormLabel>
                                     <FormControl>
-                                        <Input type="number" placeholder="e.g. 10" {...field} />
+                                        <Input type="number" placeholder="e.g. 10" {...field} onChange={event => field.onChange(+event.target.value)} />
                                     </FormControl>
                                 </FormItem>
                             )}
@@ -339,7 +358,7 @@ export default function TaskForm({
                             <FormItem>
                                 <FormLabel>Unit (optional)</FormLabel>
                                 <FormControl>
-                                    <Input placeholder="e.g. km, articles, hours" {...field} />
+                                    <Input placeholder="e.g. km, articles, hours" {...field} value={field.value || ''}/>
                                 </FormControl>
                             </FormItem>
                         )}

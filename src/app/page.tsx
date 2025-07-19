@@ -25,69 +25,70 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useCollection } from '@/hooks/use-collection';
+import {
+  addProject,
+  addTask,
+  updateTask,
+  deleteTask,
+  logProgress,
+} from '@/lib/firebase';
+import { useToast } from "@/hooks/use-toast";
 
-const initialProjects: Project[] = [
-  { id: '1', name: 'Website Redesign' },
-  { id: '2', name: 'Marketing Campaign' },
-  { id: '3', name: 'Personal' },
-  { id: '4', name: 'Health & Fitness' },
-];
-
-const initialTasks: Task[] = [
-  { id: 't1', projectId: '1', title: 'Design new homepage mockup', description: 'Create a high-fidelity mockup in Figma.', completed: false, dueDate: new Date(new Date().setDate(new Date().getDate() + 3)), tags: ['design', 'ui'] },
-  { id: 't2', projectId: '1', title: 'Develop responsive navigation', description: 'Code the navigation bar for all screen sizes.', completed: false, dueDate: new Date(new Date().setDate(new Date().getDate() + 7)), tags: ['development', 'css'] },
-  { id: 't3', projectId: '1', title: 'Review and approve final design', completed: true, dueDate: new Date(new Date().setDate(new Date().getDate() - 1)) },
-  { id: 't4', projectId: '2', title: 'Draft ad copy', description: 'Write compelling copy for the new social media ads.', completed: false, dueDate: new Date(new Date().setDate(new Date().getDate() + 2)), tags: ['copywriting'] },
-  { id: 't5', projectId: '3', title: 'Buy groceries', completed: false, description: "Milk, bread, eggs, and cheese." },
-  { id: 't6', projectId: '3', title: 'Schedule dentist appointment', completed: true, dueDate: new Date(new Date().setDate(new Date().getDate() - 10)) },
-  { id: 't7', projectId: '4', title: 'Run 10km this week', completed: false, recurrence: 'weekly', goal: { type: 'amount', target: 10, unit: 'km' }, progress: [{ date: '2024-07-28', value: 3.5 }, { date: '2024-07-29', value: 2.5 }] },
-  { id: 't8', projectId: '4', title: 'Read 5 articles', completed: false, recurrence: 'weekly', goal: { type: 'count', target: 5, unit: 'articles' }, progress: [{ date: '2024-07-28', value: 1 }, { date: '2024-07-29', value: 2 }] },
-];
 
 export default function Home() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { data: projects, loading: projectsLoading } = useCollection<Project>('projects');
+  const { data: tasks, loading: tasksLoading } = useCollection<Task>('tasks');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({ status: 'all', tag: '' });
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [loggingTask, setLoggingTask] = useState<Task | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    setProjects(initialProjects);
-    setTasks(initialTasks);
-    setSelectedProjectId(initialProjects[0]?.id || null);
-  }, []);
+    // Select the first project by default when projects load
+    if (!selectedProjectId && projects && projects.length > 0) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [projects, selectedProjectId]);
 
-  const addProject = (name: string) => {
-    const newProject: Project = { id: Date.now().toString(), name };
-    setProjects(prev => [...prev, newProject]);
+
+  const handleAddProject = async (name: string) => {
+    try {
+      await addProject({ name });
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Error adding project." });
+      console.error(error);
+    }
   };
 
-  const handleTaskSubmit = (taskData: Omit<Task, 'id' | 'completed'>) => {
-    if (editingTask) {
-      setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...editingTask, ...taskData } : t));
-    } else {
-      const newTask: Task = { ...taskData, id: Date.now().toString(), completed: false, progress: taskData.goal ? [] : undefined };
-      setTasks(prev => [newTask, ...prev]);
+  const handleTaskSubmit = async (taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      if (editingTask) {
+        await updateTask(editingTask.id, taskData);
+        toast({ title: "Task updated!" });
+      } else {
+        await addTask({ ...taskData, completed: false });
+        toast({ title: "Task added!" });
+      }
+      setEditingTask(null);
+      setIsFormOpen(false);
+    } catch (error) {
+       toast({ variant: 'destructive', title: "Error saving task." });
+       console.error(error);
     }
-    setEditingTask(null);
-    setIsFormOpen(false);
   };
   
-  const handleLogProgress = (taskId: string, log: ProgressLog) => {
-    setTasks(prev => prev.map(t => {
-      if (t.id !== taskId) return t;
-      const existingLogIndex = t.progress?.findIndex(p => p.date === log.date);
-      let newProgress = [...(t.progress || [])];
-      if (existingLogIndex !== -1) {
-        newProgress[existingLogIndex] = log;
-      } else {
-        newProgress.push(log);
-      }
-      return { ...t, progress: newProgress };
-    }));
-    setLoggingTask(null);
+  const handleLogProgress = async (taskId: string, log: ProgressLog) => {
+    try {
+        await logProgress(taskId, log);
+        setLoggingTask(null);
+        toast({ title: "Progress logged!" });
+    } catch (error) {
+        toast({ variant: 'destructive', title: "Error logging progress." });
+        console.error(error);
+    }
   }
 
   const handleEditTask = (task: Task) => {
@@ -95,18 +96,31 @@ export default function Home() {
     setIsFormOpen(true);
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(t => t.id !== taskId));
+  const handleDeleteTask = async (taskId: string) => {
+     if (window.confirm("Are you sure you want to delete this task?")) {
+        try {
+            await deleteTask(taskId);
+            toast({ title: "Task deleted." });
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error deleting task." });
+            console.error(error);
+        }
+    }
   };
 
-  const handleToggleTask = (taskId: string) => {
-    setTasks(prev => prev.map(t => {
-       if (t.id === taskId) {
-         if (t.recurrence) return t; // Recurring tasks aren't "completed" in the same way
-         return { ...t, completed: !t.completed };
-       }
-       return t;
-    }));
+  const handleToggleTask = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Prevent toggling recurring tasks
+    if (task.recurrence) return;
+
+    try {
+        await updateTask(taskId, { completed: !task.completed });
+    } catch (error) {
+        toast({ variant: 'destructive', title: "Error updating task status." });
+        console.error(error);
+    }
   };
   
   const handleFormOpen = (isOpen: boolean) => {
@@ -117,15 +131,16 @@ export default function Home() {
   }
 
   const filteredTasks = useMemo(() => {
-    return tasks
+    return (tasks || [])
       .filter(task => selectedProjectId ? task.projectId === selectedProjectId : true)
       .filter(task => filters.status === 'all' ? true : filters.status === 'completed' ? task.completed : !task.completed)
       .filter(task => filters.tag ? task.tags?.includes(filters.tag) : true);
   }, [tasks, selectedProjectId, filters]);
 
-  const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
+  const selectedProject = useMemo(() => projects?.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
 
   const allTags = useMemo(() => {
+    if (!tasks) return [];
     const tagsSet = new Set<string>();
     tasks.forEach(task => task.tags?.forEach(tag => tagsSet.add(tag)));
     return Array.from(tagsSet);
@@ -139,10 +154,11 @@ export default function Home() {
       </div>
       <div className="flex-1 overflow-y-auto">
         <ProjectList
-          projects={projects}
+          projects={projects || []}
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
-          onAddProject={addProject}
+          onAddProject={handleAddProject}
+          loading={projectsLoading}
         />
       </div>
       <div className="p-2 border-t">
@@ -175,7 +191,7 @@ export default function Home() {
               <p className="text-sm text-muted-foreground">{filteredTasks.length} tasks</p>
             </div>
           </div>
-          <Button onClick={() => setIsFormOpen(true)}>
+          <Button onClick={() => setIsFormOpen(true)} disabled={projectsLoading || !projects || projects.length === 0}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Task
           </Button>
         </header>
@@ -206,7 +222,11 @@ export default function Home() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {filteredTasks.length > 0 ? (
+          {tasksLoading ? (
+             <div className="flex items-center justify-center h-full">
+                <p>Loading tasks...</p>
+             </div>
+          ) : filteredTasks.length > 0 ? (
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredTasks.map(task => (
                 <TaskItem
@@ -225,7 +245,7 @@ export default function Home() {
               <p className="text-muted-foreground mt-2">
                 {selectedProjectId ? "This project is empty." : "You have no tasks."}
               </p>
-              <Button className="mt-4" onClick={() => setIsFormOpen(true)}>
+              <Button className="mt-4" onClick={() => setIsFormOpen(true)} disabled={projectsLoading || !projects || projects.length === 0}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Task
               </Button>
             </div>
@@ -238,7 +258,7 @@ export default function Home() {
         onOpenChange={handleFormOpen}
         onSubmit={handleTaskSubmit}
         task={editingTask}
-        projects={projects}
+        projects={projects || []}
         defaultProjectId={selectedProjectId}
       />
       <ProgressLogDialog

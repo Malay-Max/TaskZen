@@ -142,7 +142,7 @@ export const logProgress = async (taskId: string, log: ProgressLog) => {
     throw new Error("Task not found!");
   }
 
-  const taskData = taskDoc.data();
+  const taskData = taskDoc.data() as Task;
   // Ensure progress is an array
   const progress: ProgressLog[] = (taskData.progress || []).map((p: any) => ({
       ...p,
@@ -168,11 +168,22 @@ export const logProgress = async (taskId: string, log: ProgressLog) => {
     newProgressArray.push({ date: logDate, value: newProgressValue });
   }
 
-  // Update the entire progress array in Firestore
-  return updateDoc(taskRef, {
+  const dataToUpdate: { [key: string]: any } = {
     progress: newProgressArray,
     updatedAt: serverTimestamp(),
-  });
+  };
+
+  // Check if the goal is met
+  if (taskData.goal && taskData.goal.target > 0) {
+    const totalProgress = newProgressArray.reduce((acc, p) => acc + p.value, 0);
+    if (totalProgress >= taskData.goal.target) {
+      dataToUpdate.completed = true;
+    }
+  }
+
+
+  // Update the entire progress array in Firestore
+  return updateDoc(taskRef, dataToUpdate);
 };
 
 export async function fetchTasksWithTags(): Promise<Task[]> {

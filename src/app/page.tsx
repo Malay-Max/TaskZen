@@ -169,11 +169,6 @@ export default function Home() {
   );
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
-      <aside className="w-64 hidden md:flex flex-col border-r">
-        <SidebarContent />
-      </aside>
-
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="flex items-center justify-between p-4 border-b shrink-0">
            <div className="flex items-center gap-4">
@@ -256,7 +251,7 @@ export default function Home() {
             </div>
           )}
         </div>
-      </main>
+      
 
       <TaskForm
         open={isFormOpen}
@@ -271,6 +266,6 @@ export default function Home() {
         onOpenChange={() => setLoggingTask(null)}
         onLogProgress={handleLogProgress}
       />
-    </div>
+    </main>
   );
 }

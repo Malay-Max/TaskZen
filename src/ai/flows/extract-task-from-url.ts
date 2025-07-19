@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI flow to extract task details from a URL.
@@ -8,7 +9,6 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 import { format } from 'date-fns';
 
@@ -38,7 +38,6 @@ const prompt = ai.definePrompt({
   name: 'extractTaskPrompt',
   input: { schema: ExtractTaskFromUrlInputSchema },
   output: { schema: ExtractTaskFromUrlOutputSchema },
-  tools: [googleAI()],
   prompt: `You are an expert at analyzing web content and creating actionable tasks. Your task is to analyze the content of the provided URL and extract the key information to create a task in a to-do list application.
 
 Today's date is ${format(new Date(), 'PPP')}. Use this as a reference for any relative dates (e.g., "next Friday", "in 30 days").
@@ -56,7 +55,7 @@ From the content at the URL, extract the following information:
     *   Extract the **goalUnit** if specified (e.g., "articles", "km", "$").
     *   If the task is not recurring or has no clear goal, omit all these fields.
 
-Analyze the content at the following URL: {{{url}}}`,
+Analyze the content at the following URL: {{media url=url}}`,
 });
 
 const extractTaskFlow = ai.defineFlow(

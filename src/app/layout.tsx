@@ -44,7 +44,7 @@ export default function RootLayout({
                      </Button>
                  </nav>
             </aside>
-            <div className="flex-1 flex flex-col overflow-y-auto">
+            <div className="flex-1 flex flex-col overflow-y-auto hide-scrollbar">
                 {children}
             </div>
          </div>

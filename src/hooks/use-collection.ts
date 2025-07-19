@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Task, Tag } from '@/types';
+import type { Task, Tag, Project } from '@/types';
 import { fetchTasksWithTags } from '@/lib/firebase';
 
 
@@ -27,14 +27,16 @@ export function useCollection<T extends {id: string}>(collectionName: string) {
   useEffect(() => {
     // Special handling for tasks to include tags
     if (collectionName === 'tasks') {
-        const fetchTasks = async () => {
-            setLoading(true);
+        // We can't use onSnapshot for the complex task+tag query easily,
+        // so we must use a dedicated function that fetches tasks and then their tags.
+        // For real-time, we set up a listener on the tasks collection and refetch tags when tasks change.
+        setLoading(true);
+        const tasksQuery = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
+
+        const unsubscribe = onSnapshot(tasksQuery, async (snapshot) => {
             try {
-                // We cannot use onSnapshot easily for this complex query,
-                // so we will poll for now. For a production app, this would
-                // need a more sophisticated real-time strategy.
                 const tasksWithTags = await fetchTasksWithTags();
-                setData(tasksWithTags as T[]);
+                setData(tasksWithTags as any as T[]);
             } catch (err) {
                  console.error(`Error fetching collection ${collectionName}:`, err);
                  if (err instanceof Error) {
@@ -43,20 +45,32 @@ export function useCollection<T extends {id: string}>(collectionName: string) {
             } finally {
                 setLoading(false);
             }
-        }
-        fetchTasks();
-        // Simple polling every 30 seconds to simulate realtime
-        const interval = setInterval(fetchTasks, 30000);
-        return () => clearInterval(interval);
+        }, (err) => {
+            console.error(`Error with snapshot listener for ${collectionName}:`, err);
+            setError(err);
+            setLoading(false);
+        });
+
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
 
     } else {
         setLoading(true);
         let q;
+        // Default sort for most collections
+        let sortField = 'createdAt';
+        let sortDirection: 'desc' | 'asc' = 'desc';
+
         if (collectionName === 'tags') {
-            q = query(collection(db, collectionName), orderBy('name', 'asc'));
-        } else {
-             q = query(collection(db, collectionName), orderBy('createdAt', 'desc'));
+            sortField = 'name';
+            sortDirection = 'asc';
+        } else if (collectionName === 'projects') {
+            sortField = 'createdAt';
+            sortDirection = 'asc';
         }
+
+        q = query(collection(db, collectionName), orderBy(sortField, sortDirection));
+
 
         const unsubscribe = onSnapshot(
         q,

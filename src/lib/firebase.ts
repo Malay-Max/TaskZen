@@ -17,7 +17,7 @@ import {
   getDocs,
   documentId,
 } from 'firebase/firestore';
-import type { Task, Project, ProgressLog, Tag, TaskTag } from '@/types';
+import type { Task, Project, ProgressLog, Tag } from '@/types';
 import { format } from 'date-fns';
 
 const firebaseConfig: FirebaseOptions = {
@@ -37,15 +37,16 @@ const db = getFirestore(app);
 const projectsCollection = collection(db, 'projects');
 const tasksCollection = collection(db, 'tasks');
 const tagsCollection = collection(db, 'tags');
-const taskTagsCollection = collection(db, 'task_tags');
 
 // --- Helper: Manage Tags ---
-const findOrCreateTags = async (tagNames: string[], batch: any): Promise<string[]> => {
-    if (tagNames.length === 0) return [];
+const findOrCreateTags = async (tagNames: string[]): Promise<string[]> => {
+    if (!tagNames || tagNames.length === 0) return [];
+    
+    const batch = writeBatch(db);
+    const lowerCaseTagNames = tagNames.map(t => t.toLowerCase().trim()).filter(Boolean);
+    const uniqueTagNames = [...new Set(lowerCaseTagNames)];
 
-    const lowerCaseTagNames = tagNames.map(t => t.toLowerCase());
-
-    const tagsQuery = query(tagsCollection, where('name', 'in', lowerCaseTagNames));
+    const tagsQuery = query(tagsCollection, where('name', 'in', uniqueTagNames));
     const querySnapshot = await getDocs(tagsQuery);
     
     const existingTags = new Map<string, string>(); // name -> id
@@ -54,17 +55,18 @@ const findOrCreateTags = async (tagNames: string[], batch: any): Promise<string[
         existingTags.set(tag.name.toLowerCase(), doc.id);
     });
 
-    const newTagNames = lowerCaseTagNames.filter(name => !existingTags.has(name));
+    const newTagNames = uniqueTagNames.filter(name => !existingTags.has(name));
     const tagIds = Array.from(existingTags.values());
 
     for (const name of newTagNames) {
         if(name) {
             const newTagRef = doc(tagsCollection);
-            batch.set(newTagRef, { name });
+            batch.set(newTagRef, { name, createdAt: serverTimestamp() });
             tagIds.push(newTagRef.id);
         }
     }
-
+    
+    await batch.commit();
     return tagIds;
 };
 
@@ -78,7 +80,7 @@ export const addProject = async (project: Omit<Project, 'id' | 'createdAt'>) => 
 };
 
 // --- Tasks API ---
-type AddTaskData = Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'progress' | 'tags'> & {
+type AddTaskData = Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'progress' | 'tags' | 'tagIds'> & {
   completed: boolean;
   tags: string[]; // Pass tag names as strings
 };
@@ -87,19 +89,14 @@ export const addTask = async (task: AddTaskData) => {
     const batch = writeBatch(db);
     const taskRef = doc(tasksCollection);
 
-    // Handle tags
-    const tagIds = await findOrCreateTags(task.tags, batch);
-
-    // Add task_tags entries
-    for (const tagId of tagIds) {
-        const taskTagRef = doc(taskTagsCollection);
-        batch.set(taskTagRef, { taskId: taskRef.id, tagId });
-    }
+    // Handle tags: find or create them and get their IDs
+    const tagIds = await findOrCreateTags(task.tags);
 
     // Add task
     const { tags, ...taskData } = task;
     const newTask = {
         ...taskData,
+        tagIds, // Store array of tag IDs
         dueDate: taskData.dueDate ? Timestamp.fromDate(taskData.dueDate) : null,
         progress: taskData.goal ? [] : null,
         createdAt: serverTimestamp(),
@@ -110,52 +107,31 @@ export const addTask = async (task: AddTaskData) => {
     return batch.commit();
 };
 
-export const updateTask = async (taskId: string, task: Partial<Omit<Task, 'id' | 'tags'>> & { tags?: string[] }) => {
-    const batch = writeBatch(db);
+export const updateTask = async (taskId: string, task: Partial<Omit<Task, 'id' | 'tags' | 'tagIds'>> & { tags?: string[] }) => {
     const taskRef = doc(db, 'tasks', taskId);
-
-    // Handle tags if they are being updated
-    if (task.tags !== undefined) {
-        // 1. Delete existing tag associations for this task
-        const q = query(taskTagsCollection, where('taskId', '==', taskId));
-        const oldTaskTagsSnapshot = await getDocs(q);
-        oldTaskTagsSnapshot.forEach(doc => batch.delete(doc.ref));
-
-        // 2. Create new tags and associations
-        const tagIds = await findOrCreateTags(task.tags, batch);
-        for (const tagId of tagIds) {
-            const taskTagRef = doc(taskTagsCollection);
-            batch.set(taskTagRef, { taskId, tagId });
-        }
-    }
 
     // Prepare task data for update
     const { tags, ...taskData } = task;
     const dataToUpdate: { [key: string]: any } = { ...taskData };
+
+    // Handle tags if they are being updated
+    if (tags !== undefined) {
+         const tagIds = await findOrCreateTags(tags);
+         dataToUpdate.tagIds = tagIds;
+    }
+    
     if (taskData.dueDate) {
         dataToUpdate.dueDate = Timestamp.fromDate(taskData.dueDate);
     }
     dataToUpdate.updatedAt = serverTimestamp();
 
-    batch.update(taskRef, dataToUpdate);
-
-    return batch.commit();
+    return updateDoc(taskRef, dataToUpdate);
 };
 
 
 export const deleteTask = async (taskId: string) => {
-    const batch = writeBatch(db);
-    
-    // Delete task document
     const taskRef = doc(db, 'tasks', taskId);
-    batch.delete(taskRef);
-
-    // Delete associated tag links
-    const q = query(taskTagsCollection, where('taskId', '==', taskId));
-    const taskTagsSnapshot = await getDocs(q);
-    taskTagsSnapshot.forEach(doc => batch.delete(doc.ref));
-
-    return batch.commit();
+    return deleteDoc(taskRef);
 };
 
 
@@ -208,39 +184,27 @@ export async function fetchTasksWithTags(): Promise<Task[]> {
       dueDate: data.dueDate ? (data.dueDate as Timestamp).toDate() : null,
       createdAt: (data.createdAt as Timestamp).toDate(),
       updatedAt: (data.updatedAt as Timestamp).toDate(),
-      tags: [], // Start with empty tags
+      tagIds: data.tagIds || [],
+      tags: [], // Start with empty tags, to be populated
     } as Task;
   });
 
-  const taskIds = tasks.map(t => t.id);
+  const allTagIds = [...new Set(tasks.flatMap(t => t.tagIds))];
 
-  // Get all task-tag relationships
-  const taskTagsQuery = query(taskTagsCollection, where('taskId', 'in', taskIds));
-  const taskTagsSnapshot = await getDocs(taskTagsQuery);
-  const taskTags = taskTagsSnapshot.docs.map(doc => doc.data() as TaskTag);
+  if (allTagIds.length > 0) {
+      const tagsQuery = query(tagsCollection, where(documentId(), 'in', allTagIds));
+      const tagsSnapshot = await getDocs(tagsQuery);
+      const tagsMap = new Map<string, Tag>();
+      tagsSnapshot.forEach(doc => tagsMap.set(doc.id, { id: doc.id, ...doc.data() } as Tag));
   
-  if (taskTags.length === 0) return tasks;
-
-  // Get all unique tag IDs from the relationships
-  const tagIds = [...new Set(taskTags.map(tt => tt.tagId))];
-
-  // Get all tag documents
-  const tagsQuery = query(tagsCollection, where(documentId(), 'in', tagIds));
-  const tagsSnapshot = await getDocs(tagsQuery);
-  const tagsMap = new Map<string, Tag>();
-  tagsSnapshot.forEach(doc => tagsMap.set(doc.id, { id: doc.id, ...doc.data() } as Tag));
-
-  // Map tags back to their tasks
-  const tasksById = new Map(tasks.map(t => [t.id, t]));
-  for (const taskTag of taskTags) {
-    const task = tasksById.get(taskTag.taskId);
-    const tag = tagsMap.get(taskTag.tagId);
-    if (task && tag) {
-      task.tags?.push(tag);
-    }
+      // Map tags back to their tasks
+      tasks.forEach(task => {
+          task.tags = task.tagIds.map(tagId => tagsMap.get(tagId)).filter(Boolean) as Tag[];
+      });
   }
 
-  return Array.from(tasksById.values()).sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  return tasks.sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 

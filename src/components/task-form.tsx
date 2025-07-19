@@ -43,7 +43,7 @@ import { CalendarIcon } from 'lucide-react';
 import type { Task, Project } from '@/types';
 
 // Omit properties that are auto-generated or handled separately
-type TaskSubmitData = Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt' | 'progress' | 'tags'> & { tags: string[] };
+type TaskSubmitData = Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt' | 'progress' | 'tags' | 'tagIds'> & { tags: string[] };
 
 
 const formSchema = z.object({
@@ -73,7 +73,7 @@ type TaskFormValues = z.infer<typeof formSchema>;
 interface TaskFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: TaskSubmitData) => void;
+  onSubmit: (data: any) => void; // Changed to any to accommodate simpler submit data
   task?: Task | null;
   projects: Project[];
   defaultProjectId?: string | null;
@@ -147,7 +147,7 @@ export default function TaskForm({
 
   const handleSubmit = (data: TaskFormValues) => {
     const { isRecurring, goalType, goalTarget, goalUnit, ...rest } = data;
-    const processedData: TaskSubmitData = {
+    const processedData = {
       ...rest,
       tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
       // Set recurrence and goal to null if not a recurring task
@@ -268,7 +268,7 @@ export default function TaskForm({
                   <FormItem>
                     <FormLabel>Tags (comma-separated)</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. urgent, marketing, design" {...field} />
+                      <Input placeholder="e.g. urgent, marketing, design" {...field} value={field.value || ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -5,8 +5,8 @@ export type Task = {
   dueDate: Date | null;
   completed: boolean;
   projectId: string;
-  // tags are now managed via a join table
-  tags?: Tag[]; // This will be populated after fetching from the join table
+  tagIds: string[]; // Store an array of tag IDs
+  tags?: Tag[]; // This will be populated on the client
   recurrence: 'daily' | 'weekly' | 'monthly' | null;
   goal: {
     type: 'count' | 'amount';
@@ -34,10 +34,11 @@ export type Tag = {
     name: string;
 }
 
-export type TaskTag = {
-    taskId: string;
-    tagId: string;
-}
+// This is no longer needed with the new data model
+// export type TaskTag = {
+//     taskId: string;
+//     tagId: string;
+// }
 
 export type Filters = {
   status: 'all' | 'completed' | 'incomplete';

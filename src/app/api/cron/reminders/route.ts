@@ -1,6 +1,5 @@
-
 // src/app/api/cron/reminders/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { fetchTasksWithTags } from '@/lib/firebase';
 import { sendTelegramReminder } from '@/lib/telegram';
 import {
@@ -18,7 +17,12 @@ const sentReminders = new Set<string>();
 const RECURRING_REMINDER_HOUR = 19; // 7 PM
 const REMINDER_WINDOW_HOURS = 1; // Remind 1 hour before due
 
-export async function GET() {
+export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   try {
     const tasks = await fetchTasksWithTags();
     const now = new Date();
@@ -79,4 +83,9 @@ export async function GET() {
     }
     return NextResponse.json({ success: false, error: 'An unknown error occurred.' }, { status: 500 });
   }
+}
+
+// Allow GET requests for simple browser testing/pinging, but they won't run the job.
+export async function GET() {
+    return NextResponse.json({ message: "This endpoint is for a POST cron job. Please trigger it with a POST request and the correct secret." });
 }

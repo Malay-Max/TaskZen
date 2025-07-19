@@ -1,6 +1,6 @@
 # TaskZen on Firebase Studio
 
-This is a Next.js task management application built in Firebase Studio. It uses Firebase Firestore for real-time data persistence and sends task reminders via Telegram.
+This is a Next.js task management application built in Firebase Studio. It uses Firebase Firestore for real-time data persistence and can send task reminders via Telegram using a scheduled GitHub Action.
 
 ## Getting Started
 
@@ -27,7 +27,7 @@ To run this project locally, you'll need to set up a Firebase project and a Tele
 
 1.  In the root of your project, create a new file named `.env.local` if it doesn't exist.
 2.  Copy the contents of `.env` into your new `.env.local` file.
-3.  Replace the placeholder values with your Firebase credentials (from step 1.6), and your Telegram Bot Token and Chat ID (from step 2).
+3.  Replace the placeholder values with your Firebase credentials (from step 1.6), your Telegram Bot Token and Chat ID (from step 2), and create a secure, random string for `CRON_SECRET`.
 
 ### 4. Install Dependencies and Run
 
@@ -36,13 +36,21 @@ npm install
 npm run dev
 ```
 
-Your app should now be running locally, connected to your Firebase Firestore database and ready to send Telegram reminders!
+Your app should now be running locally, connected to your Firebase Firestore database.
 
 ### How Reminders Work
 
-The application checks for tasks that need reminders every minute *while the app is open in a browser tab*. This includes:
--   Tasks that are due within the next hour.
--   Tasks that are overdue.
--   Daily recurring tasks that have not had progress logged by 7 PM local time.
+The application uses a **GitHub Actions workflow** to send reminders. This is a reliable and free way to run scheduled tasks.
 
-For a production environment, you would want to move this reminder logic to a server-side cron job (e.g., using Firebase Functions or Vercel Cron Jobs) to ensure reminders are sent even when the app is closed.
+1.  **The Trigger**: A workflow file at `.github/workflows/reminders.yml` is configured to run on a schedule (e.g., every 15 minutes).
+2.  **The API Call**: The GitHub Action sends a `POST` request to an API route within your app (`/api/cron/reminders`). This request is secured with a secret token to prevent unauthorized access.
+3.  **The Logic**: The API route contains all the logic to check for tasks that are due soon, overdue, or need a recurring progress reminder. If it finds any, it sends a message using your Telegram Bot.
+
+To get this working in your deployed application:
+
+1.  Deploy your application to a hosting provider like Vercel.
+2.  In your GitHub repository, go to **Settings > Secrets and variables > Actions**.
+3.  Create a new repository secret named `CRON_SECRET` and paste the same secret token you used in your `.env.local` file.
+4.  Create another repository secret named `PRODUCTION_URL` and set its value to the full URL of your deployed application (e.g., `https://your-app-name.vercel.app`).
+
+The GitHub Action will now automatically trigger your application's reminder endpoint on the defined schedule.

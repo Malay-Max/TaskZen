@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import type { Task, Project, Filters, ProgressLog } from '@/types';
+import type { Task, Project, Filters, ProgressLog, Tag } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -38,7 +38,9 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const { data: projects, loading: projectsLoading } = useCollection<Project>('projects');
-  const { data: tasks, loading: tasksLoading } = useCollection<Task>('tasks');
+  const { data: tasks, loading: tasksLoading, error: tasksError } = useCollection<Task>('tasks');
+  const { data: allTags, loading: tagsLoading } = useCollection<Tag>('tags');
+
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>({ status: 'all', tag: '' });
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -63,7 +65,7 @@ export default function Home() {
     }
   };
 
-  const handleTaskSubmit = async (taskData: Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt'>) => {
+  const handleTaskSubmit = async (taskData: any) => {
     try {
       if (editingTask) {
         await updateTask(editingTask.id, taskData);
@@ -134,17 +136,15 @@ export default function Home() {
     return (tasks || [])
       .filter(task => selectedProjectId ? task.projectId === selectedProjectId : true)
       .filter(task => filters.status === 'all' ? true : filters.status === 'completed' ? task.completed : !task.completed)
-      .filter(task => filters.tag ? task.tags?.includes(filters.tag) : true);
+      .filter(task => filters.tag ? task.tags?.some(t => t.name === filters.tag) : true);
   }, [tasks, selectedProjectId, filters]);
 
   const selectedProject = useMemo(() => projects?.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
 
-  const allTags = useMemo(() => {
-    if (!tasks) return [];
-    const tagsSet = new Set<string>();
-    tasks.forEach(task => task.tags?.forEach(tag => tagsSet.add(tag)));
-    return Array.from(tagsSet);
-  }, [tasks]);
+  const availableTags = useMemo(() => {
+    if (!allTags) return [];
+    return allTags.map(t => t.name);
+  }, [allTags]);
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -217,7 +217,7 @@ export default function Home() {
             </SelectContent>
           </Select>
           <div className="flex-1" />
-          {allTags.length > 0 && <span className="text-sm text-muted-foreground hidden lg:block">Available tags: {allTags.join(', ')}</span>}
+          {!tagsLoading && availableTags.length > 0 && <span className="text-sm text-muted-foreground hidden lg:block">Available tags: {availableTags.join(', ')}</span>}
 
         </div>
 
@@ -226,7 +226,11 @@ export default function Home() {
              <div className="flex items-center justify-center h-full">
                 <p>Loading tasks...</p>
              </div>
-          ) : filteredTasks.length > 0 ? (
+          ) : tasksError ? (
+            <div className="flex items-center justify-center h-full text-red-500">
+                <p>Error: {tasksError.message}</p>
+             </div>
+          ): filteredTasks.length > 0 ? (
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredTasks.map(task => (
                 <TaskItem

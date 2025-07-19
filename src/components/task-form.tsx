@@ -43,7 +43,7 @@ import { CalendarIcon } from 'lucide-react';
 import type { Task, Project } from '@/types';
 
 // Omit properties that are auto-generated or handled separately
-type TaskSubmitData = Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt' | 'progress'>;
+type TaskSubmitData = Omit<Task, 'id' | 'completed' | 'createdAt' | 'updatedAt' | 'progress' | 'tags'> & { tags: string[] };
 
 
 const formSchema = z.object({
@@ -108,7 +108,7 @@ export default function TaskForm({
         description: task.description || '',
         projectId: task.projectId,
         dueDate: task.dueDate || null,
-        tags: task.tags?.join(', ') || '',
+        tags: task.tags?.map(t => t.name).join(', ') || '',
         isRecurring: !!task.recurrence,
         recurrence: task.recurrence || undefined,
         goalType: task.goal?.type || undefined,

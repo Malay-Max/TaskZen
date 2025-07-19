@@ -142,8 +142,8 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
                 </Badge>
             )}
             {tags?.map((tag) => (
-              <Badge key={tag} variant="secondary">
-                {tag}
+              <Badge key={tag.id} variant="secondary">
+                {tag.name}
               </Badge>
             ))}
         </div>

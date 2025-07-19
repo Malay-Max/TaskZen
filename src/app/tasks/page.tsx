@@ -151,7 +151,7 @@ export default function TasksPage() {
     <div className="flex flex-col h-full">
       <div className="p-4 flex items-center gap-2 border-b">
         <TaskZenIcon />
-        <h1 className="text-xl font-bold">TaskZen</h1>
+        <h1 className="text-xl font-bold">Projects</h1>
       </div>
       <div className="flex-1 overflow-y-auto">
         <ProjectList
@@ -169,6 +169,10 @@ export default function TasksPage() {
   );
 
   return (
+    <div className="flex h-full">
+      <aside className="w-72 hidden md:flex flex-col border-r bg-card">
+        <SidebarContent />
+      </aside>
       <main className="flex-1 flex flex-col overflow-hidden">
         <header className="flex items-center justify-between p-4 border-b shrink-0">
            <div className="flex items-center gap-4">
@@ -267,5 +271,6 @@ export default function TasksPage() {
         onLogProgress={handleLogProgress}
       />
     </main>
+    </div>
   );
 }

@@ -22,7 +22,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import type { Task, ProgressLog } from '@/types';
 
 const formSchema = z.object({
@@ -51,11 +51,13 @@ export default function ProgressLogDialog({ task, onOpenChange, onLogProgress }:
   });
 
   useEffect(() => {
+    // Reset the form when the dialog opens for a new task.
+    // We no longer set the value to the day's existing log,
+    // as we are now adding to it.
     if (task) {
-      const todaysLog = task.progress?.find(p => p.date === currentDate);
       form.reset({
         date: currentDate,
-        value: todaysLog?.value || 0,
+        value: 0, // Always start with 0 for additive logging
       });
     }
   }, [task, currentDate, form]);
@@ -65,10 +67,15 @@ export default function ProgressLogDialog({ task, onOpenChange, onLogProgress }:
   }
   
   const handleSubmit = (data: ProgressFormValues) => {
-    if (task) {
+    if (task && data.value > 0) { // Only log if there's a value
       onLogProgress(task.id, data);
+    } else {
+      // If value is 0, just close the dialog without doing anything
+      onOpenChange(false);
     }
   };
+
+  const totalProgressToday = task.progress?.find(p => p.date === currentDate)?.value || 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -76,7 +83,9 @@ export default function ProgressLogDialog({ task, onOpenChange, onLogProgress }:
         <DialogHeader>
           <DialogTitle>Log Progress for "{task.title}"</DialogTitle>
           <DialogDescription>
-            Enter your progress for today ({format(new Date(), 'MMM d, yyyy')}).
+            Enter the additional progress you made today ({format(new Date(), 'MMM d, yyyy')}).
+            <br />
+            You've logged <span className="font-semibold">{totalProgressToday.toLocaleString()}</span> so far today.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -87,10 +96,10 @@ export default function ProgressLogDialog({ task, onOpenChange, onLogProgress }:
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Today's Progress {task.goal?.unit ? `(${task.goal.unit})` : ''}
+                    Additional Progress {task.goal?.unit ? `(${task.goal.unit})` : ''}
                   </FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.1" {...field} />
+                    <Input type="number" step="0.1" {...field} autoFocus />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

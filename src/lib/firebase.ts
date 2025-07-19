@@ -9,7 +9,6 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
-  arrayUnion,
   getDoc,
   Timestamp,
   query,
@@ -144,32 +143,36 @@ export const logProgress = async (taskId: string, log: ProgressLog) => {
   }
 
   const taskData = taskDoc.data();
-  // Ensure progress is an array, converting from Firestore Timestamps if necessary
+  // Ensure progress is an array
   const progress: ProgressLog[] = (taskData.progress || []).map((p: any) => ({
       ...p,
+      // Firestore timestamps need to be converted, but our log dates are strings
       date: p.date instanceof Timestamp ? format(p.date.toDate(), 'yyyy-MM-dd') : p.date
   }));
 
-  const logDate = log.date; // Already in YYYY-MM-DD format
+  const logDate = log.date; // Already in YYYY-MM-DD format from the form
+  const newProgressValue = log.value;
 
   const existingLogIndex = progress.findIndex(p => p.date === logDate);
-
-  const batch = writeBatch(db);
+  const newProgressArray = [...progress];
 
   if (existingLogIndex !== -1) {
-    // If a log for today exists, we overwrite the whole array.
-    const newProgress = [...progress];
-    newProgress[existingLogIndex] = { ...log, date: logDate };
-    batch.update(taskRef, { progress: newProgress, updatedAt: serverTimestamp() });
+    // If a log for today exists, add the new value to the existing value.
+    const existingLog = newProgressArray[existingLogIndex];
+    newProgressArray[existingLogIndex] = {
+      ...existingLog,
+      value: existingLog.value + newProgressValue,
+    };
   } else {
-    // Atomically add a new log to the "progress" array field.
-    batch.update(taskRef, {
-      progress: arrayUnion({ ...log, date: logDate }),
-      updatedAt: serverTimestamp(),
-    });
+    // If no log for today exists, add a new log entry.
+    newProgressArray.push({ date: logDate, value: newProgressValue });
   }
 
-  return batch.commit();
+  // Update the entire progress array in Firestore
+  return updateDoc(taskRef, {
+    progress: newProgressArray,
+    updatedAt: serverTimestamp(),
+  });
 };
 
 export async function fetchTasksWithTags(): Promise<Task[]> {

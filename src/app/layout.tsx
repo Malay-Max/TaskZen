@@ -9,6 +9,8 @@ import { LayoutGrid, ListTodo, Menu } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
+  SheetHeader,
+  SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
 
@@ -63,6 +65,9 @@ export default function RootLayout({
                         </Button>
                       </SheetTrigger>
                       <SheetContent side="right">
+                        <SheetHeader>
+                           <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                        </SheetHeader>
                         <div className="grid gap-4 p-4">
                             <Link href="/" className="flex items-center gap-2 font-semibold mb-4">
                                 <TaskZenIcon />

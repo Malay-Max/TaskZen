@@ -49,7 +49,10 @@ export default function ProjectDistributionChart({ data }: ProjectDistributionCh
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Legend iconSize={10} />
+              <Legend 
+                iconSize={10} 
+                wrapperStyle={{ color: 'hsl(var(--foreground))' }}
+              />
             </PieChart>
           </ResponsiveContainer>
         ) : (

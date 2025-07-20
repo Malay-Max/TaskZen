@@ -35,9 +35,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Send an immediate confirmation message for testing.
-    await sendTelegramReminder('✅ GitHub Actions workflow triggered successfully!');
-
     const tasks = await fetchTasksWithTags();
     const now = new Date();
     const todayStr = format(now, 'yyyy-MM-dd');

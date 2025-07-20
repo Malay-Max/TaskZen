@@ -12,6 +12,6 @@ jobs:
     steps:
       - name: Call Reminder API Endpoint
         run: |
-          curl -X POST '${{ secrets.PRODUCTION_URL }}/api/cron/reminders' \
+          curl -i -X POST '${{ secrets.PRODUCTION_URL }}/api/cron/reminders' \
           -H 'Authorization: Bearer ${{ secrets.CRON_SECRET }}' \
           -H 'Content-Type: application/json'

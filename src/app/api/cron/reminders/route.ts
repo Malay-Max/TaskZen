@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    console.error("Cron job unauthorized. Check CRON_SECRET.");
+    console.error("Cron job unauthorized. Check CRON_SECRET. Header was:", authHeader);
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

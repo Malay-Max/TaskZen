@@ -13,6 +13,10 @@ import {
   isSameDay,
 } from 'date-fns';
 
+// This line is crucial for Vercel deployments. It ensures the route is always dynamic
+// and can handle POST requests, preventing a 405 Method Not Allowed error.
+export const dynamic = 'force-dynamic';
+
 // This is a simple in-memory cache to prevent sending the same reminder multiple times *within a single cron job execution*.
 // For a production system with multiple server instances, a more persistent store like Firestore or Redis would be needed.
 const sentReminders = new Set<string>();

@@ -32,8 +32,9 @@ export default function ProjectDistributionChart({ data }: ProjectDistributionCh
                     background: 'hsl(var(--background))',
                     border: '1px solid hsl(var(--border))',
                     borderRadius: 'var(--radius)',
-                    color: 'hsl(var(--foreground))'
                  }}
+                 labelStyle={{ color: 'hsl(var(--foreground))' }}
+                 itemStyle={{ color: 'hsl(var(--foreground))' }}
               />
               <Pie
                 data={data}

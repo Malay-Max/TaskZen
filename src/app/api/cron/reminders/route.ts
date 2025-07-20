@@ -8,6 +8,8 @@ import {
   subDays,
   isPast,
   format,
+  differenceInMinutes,
+  isSameDay,
 } from 'date-fns';
 
 // This is a simple in-memory cache to prevent sending the same reminder multiple times.
@@ -16,6 +18,7 @@ const sentReminders = new Set<string>();
 
 const RECURRING_REMINDER_HOUR = 19; // 7 PM
 const REMINDER_WINDOW_DAYS = 1; // Remind 1 day before due
+const IMMINENT_WINDOWS = [30, 10]; // 30 and 10 minutes before
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -36,23 +39,38 @@ export async function POST(request: NextRequest) {
             const dueDate = new Date(task.dueDate);
             const reminderTime = subDays(dueDate, REMINDER_WINDOW_DAYS);
 
-            // Due Soon Reminder
+            // Due Soon Reminder (1 day before)
             const dueSoonKey = `${task.id}-${format(dueDate, 'yyyy-MM-dd')}-due-soon`;
             if (
                 isAfter(now, reminderTime) &&
                 isBefore(now, dueDate) &&
+                !isSameDay(now, dueDate) && // Don't send if it's due today
                 !sentReminders.has(dueSoonKey)
             ) {
                 console.log(`Sending 'due soon' reminder for task: ${task.title}`);
                 await sendTelegramReminder(`⏰ Task due tomorrow: "${task.title}" is due at ${format(dueDate, 'p')}.`);
                 sentReminders.add(dueSoonKey);
             }
+            
+            // Imminent Reminders (30 and 10 mins before)
+            const minutesUntilDue = differenceInMinutes(dueDate, now);
+            if(minutesUntilDue > 0) {
+                for (const window of IMMINENT_WINDOWS) {
+                    const imminentKey = `${task.id}-${format(dueDate, 'yyyy-MM-dd-HH-mm')}-imminent-${window}`;
+                    if (minutesUntilDue <= window && minutesUntilDue > (window - 5) && !sentReminders.has(imminentKey)) {
+                        console.log(`Sending 'imminent' reminder for task: ${task.title}`);
+                        await sendTelegramReminder(`❗ Task due in ${window} minutes: "${task.title}".`);
+                        sentReminders.add(imminentKey);
+                    }
+                }
+            }
+
 
             // Overdue Reminder
             const overdueKey = `${task.id}-${format(dueDate, 'yyyy-MM-dd')}-overdue`;
             if (isPast(dueDate) && !sentReminders.has(overdueKey)) {
                 console.log(`Sending 'overdue' reminder for task: ${task.title}`);
-                await sendTelegramReminder(`⚠️ Task overdue: "${task.title}" was due on ${format(dueDate, 'MMM d')}.`);
+                await sendTelegramReminder(`⚠️ Task overdue: "${task.title}" was due on ${format(dueDate, 'MMM d, p')}.`);
                 sentReminders.add(overdueKey);
             }
         }

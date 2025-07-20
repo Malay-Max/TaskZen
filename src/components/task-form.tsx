@@ -39,7 +39,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, set } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import type { Task, Project } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +54,7 @@ const formSchema = z.object({
   description: z.string().max(500).optional().transform(val => val || null),
   projectId: z.string({ required_error: 'Please select a project.' }),
   dueDate: z.date().nullable().optional(),
+  dueTime: z.string().optional(),
   tags: z.string().optional(),
   isRecurring: z.boolean().default(false),
   recurrence: z.enum(['daily', 'weekly', 'monthly']).optional(),
@@ -99,6 +100,7 @@ export default function TaskForm({
       description: '',
       projectId: defaultProjectId || '',
       dueDate: null,
+      dueTime: '',
       tags: '',
       isRecurring: false,
       recurrence: undefined,
@@ -109,6 +111,7 @@ export default function TaskForm({
   });
 
   const isRecurring = form.watch('isRecurring');
+  const dueDate = form.watch('dueDate');
 
   const resetForm = (taskToReset?: Task | null) => {
     if (taskToReset) {
@@ -116,7 +119,8 @@ export default function TaskForm({
         title: taskToReset.title,
         description: taskToReset.description || '',
         projectId: taskToReset.projectId,
-        dueDate: taskToReset.dueDate || null,
+        dueDate: taskToReset.dueDate ? new Date(taskToReset.dueDate) : null,
+        dueTime: taskToReset.dueDate ? format(new Date(taskToReset.dueDate), 'HH:mm') : '',
         tags: taskToReset.tags?.map(t => t.name).join(', ') || '',
         isRecurring: !!taskToReset.recurrence,
         recurrence: taskToReset.recurrence || undefined,
@@ -130,6 +134,7 @@ export default function TaskForm({
         description: '',
         projectId: defaultProjectId || projects[0]?.id || '',
         dueDate: null,
+        dueTime: '',
         tags: '',
         isRecurring: false,
         recurrence: undefined,
@@ -156,15 +161,24 @@ export default function TaskForm({
         form.setValue('goalUnit', '');
     } else {
        form.setValue('dueDate', null); // Recurring tasks don't have a fixed due date
+       form.setValue('dueTime', '');
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecurring]);
 
 
   const handleSubmit = (data: TaskFormValues) => {
-    const { isRecurring, goalType, goalTarget, goalUnit, ...rest } = data;
+    const { isRecurring, goalType, goalTarget, goalUnit, dueTime, ...rest } = data;
+    
+    let finalDueDate: Date | null = data.dueDate;
+    if (finalDueDate && dueTime) {
+      const [hours, minutes] = dueTime.split(':').map(Number);
+      finalDueDate = set(finalDueDate, { hours, minutes });
+    }
+
     const processedData = {
       ...rest,
+      dueDate: finalDueDate,
       tags: data.tags ? data.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
       // Set recurrence and goal to null if not a recurring task
       recurrence: isRecurring ? data.recurrence! : null,
@@ -235,6 +249,8 @@ export default function TaskForm({
                   </FormItem>
                 )}
               />
+            </div>
+             <div className="grid grid-cols-2 gap-4">
                <FormField
                 control={form.control}
                 name="dueDate"
@@ -247,18 +263,18 @@ export default function TaskForm({
                           <Button
                             variant={'outline'}
                             className={cn(
-                              'w-full pl-3 text-left font-normal',
+                              'w-full justify-start text-left font-normal',
                               !field.value && 'text-muted-foreground',
                                isRecurring && 'opacity-50 cursor-not-allowed'
                             )}
                             disabled={isRecurring}
                           >
+                            <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                             {field.value ? (
                               format(field.value, 'PPP')
                             ) : (
                               <span>Pick a date</span>
                             )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
@@ -276,6 +292,26 @@ export default function TaskForm({
                   </FormItem>
                 )}
               />
+               <FormField
+                  control={form.control}
+                  name="dueTime"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Time (optional)</FormLabel>
+                       <FormControl>
+                         <Input 
+                            type="time" 
+                            {...field}
+                            disabled={!dueDate || isRecurring}
+                            className={cn(
+                              (!dueDate || isRecurring) && 'opacity-50 cursor-not-allowed'
+                            )}
+                          />
+                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
             </div>
              <FormField
                 control={form.control}

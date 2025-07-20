@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CalendarIcon, Repeat, Folder, Tag as TagIcon } from 'lucide-react';
+import { CalendarIcon, Repeat, Folder, Tag as TagIcon, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Task, Project } from '@/types';
 
@@ -38,6 +38,12 @@ export default function TaskDetailModal({ task, projects, onOpenChange }: TaskDe
     if (!task || !task.goal || !task.goal.target) return 0;
     return (currentProgress / task.goal.target) * 100;
   }, [currentProgress, task]);
+  
+  const hasTime = useMemo(() => {
+    if (!task?.dueDate) return false;
+    const date = new Date(task.dueDate);
+    return date.getHours() !== 0 || date.getMinutes() !== 0;
+  }, [task]);
 
 
   if (!task) {
@@ -72,8 +78,11 @@ export default function TaskDetailModal({ task, projects, onOpenChange }: TaskDe
             {task.dueDate && !task.recurrence && (
                 <div className="flex items-center gap-2">
                     <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold">Due Date:</span>
-                    <span className="text-muted-foreground">{format(task.dueDate, 'PPP')}</span>
+                    <span className="font-semibold">Due:</span>
+                    <span className="text-muted-foreground">
+                        {format(task.dueDate, 'PPP')}
+                        {hasTime && ` at ${format(task.dueDate, 'p')}`}
+                    </span>
                 </div>
             )}
             {task.recurrence && (

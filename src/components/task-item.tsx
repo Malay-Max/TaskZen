@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
-import { MoreVertical, Calendar as CalendarIcon, Pencil, Trash2, PlusCircle, Repeat } from 'lucide-react';
+import { MoreVertical, Calendar as CalendarIcon, Pencil, Trash2, PlusCircle, Repeat, Clock } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Task } from '@/types';
@@ -44,6 +44,12 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
       ? 'due-today'
       : 'upcoming'
     : 'none';
+    
+  const hasTime = useMemo(() => {
+    if (!dueDate) return false;
+    const date = new Date(dueDate);
+    return date.getHours() !== 0 || date.getMinutes() !== 0;
+  }, [dueDate]);
     
   const currentProgress = useMemo(() => {
     if (!progress) return 0;
@@ -143,13 +149,19 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
             {dueDate && !recurrence && (
               <Badge
                 variant="outline"
-                className={cn({
+                className={cn('flex items-center', {
                   'text-red-600 border-red-600/50 dark:text-red-400 dark:border-red-400/50': dueDateStatus === 'overdue' && !completed,
                   'text-amber-600 border-amber-600/50 dark:text-amber-400 dark:border-amber-400/50': dueDateStatus === 'due-today' && !completed,
                 })}
               >
                 <CalendarIcon className="mr-1.5 h-3 w-3" />
                 {format(dueDate, 'MMM d')}
+                {hasTime && (
+                   <>
+                     <Clock className="ml-1.5 mr-1 h-3 w-3" />
+                     {format(dueDate, 'p')}
+                   </>
+                )}
               </Badge>
             )}
             {recurrence && (

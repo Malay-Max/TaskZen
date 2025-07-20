@@ -159,7 +159,7 @@ export default function TasksPage() {
         <TaskZenIcon />
         <h1 className="text-xl font-bold">Projects</h1>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto hide-scrollbar">
         <ProjectList
           projects={projects || []}
           selectedProjectId={selectedProjectId}
@@ -227,7 +227,7 @@ export default function TasksPage() {
 
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 hide-scrollbar">
           {tasksLoading ? (
              <div className="flex items-center justify-center h-full">
                 <p>Loading tasks...</p>

@@ -26,7 +26,6 @@ const nextConfig: NextConfig = {
             fs: false
         };
     }
-    config.externals.push('node-fetch');
 
     return config;
   },

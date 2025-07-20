@@ -1,8 +1,6 @@
 // src/lib/telegram.ts
 'use server';
 
-import fetch from 'node-fetch';
-
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 

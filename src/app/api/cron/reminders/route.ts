@@ -5,7 +5,7 @@ import { sendTelegramReminder } from '@/lib/telegram';
 import {
   isAfter,
   isBefore,
-  subHours,
+  subDays,
   isPast,
   format,
 } from 'date-fns';
@@ -15,7 +15,7 @@ import {
 const sentReminders = new Set<string>();
 
 const RECURRING_REMINDER_HOUR = 19; // 7 PM
-const REMINDER_WINDOW_HOURS = 1; // Remind 1 hour before due
+const REMINDER_WINDOW_DAYS = 1; // Remind 1 day before due
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         // --- Standard (One-Off) Task Reminders ---
         if (task.dueDate && !task.recurrence) {
             const dueDate = new Date(task.dueDate);
-            const reminderTime = subHours(dueDate, REMINDER_WINDOW_HOURS);
+            const reminderTime = subDays(dueDate, REMINDER_WINDOW_DAYS);
 
             // Due Soon Reminder
             const dueSoonKey = `${task.id}-${format(dueDate, 'yyyy-MM-dd')}-due-soon`;
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
                 !sentReminders.has(dueSoonKey)
             ) {
                 console.log(`Sending 'due soon' reminder for task: ${task.title}`);
-                await sendTelegramReminder(`⏰ Task due soon: "${task.title}" is due at ${format(dueDate, 'p')}.`);
+                await sendTelegramReminder(`⏰ Task due tomorrow: "${task.title}" is due at ${format(dueDate, 'p')}.`);
                 sentReminders.add(dueSoonKey);
             }
 

@@ -5,7 +5,13 @@ import { Toaster } from "@/components/ui/toaster"
 import { TaskZenIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { LayoutGrid, ListTodo } from 'lucide-react';
+import { LayoutGrid, ListTodo, Menu } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
 
 export const metadata: Metadata = {
   title: 'TaskZen',
@@ -25,26 +31,64 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-         <div className="flex h-screen bg-background text-foreground">
-            {/* Sidebar */}
-            <aside className="w-20 hidden md:flex flex-col items-center space-y-4 py-4 border-r bg-card">
-                 <Link href="/" className="flex items-center gap-2">
+         <div className="flex flex-col h-screen bg-background text-foreground">
+            {/* Responsive Header */}
+            <header className="flex h-16 items-center justify-between px-4 md:px-6 border-b shrink-0">
+                <Link href="/" className="flex items-center gap-2 font-semibold">
                     <TaskZenIcon />
-                 </Link>
-                 <nav className="flex flex-col items-center gap-4">
-                     <Button variant="ghost" size="icon" asChild>
-                         <Link href="/tasks" title="Tasks">
-                             <ListTodo className="h-5 w-5" />
+                    <span className="text-lg">TaskZen</span>
+                </Link>
+                {/* Desktop Navigation */}
+                <nav className="hidden md:flex items-center gap-4">
+                     <Button variant="ghost" asChild>
+                         <Link href="/tasks">
+                             <ListTodo className="h-5 w-5 mr-2" />
+                             Tasks
                          </Link>
                      </Button>
-                     <Button variant="ghost" size="icon" asChild>
-                         <Link href="/" title="Dashboard">
-                             <LayoutGrid className="h-5 w-5" />
+                     <Button variant="ghost" asChild>
+                         <Link href="/">
+                             <LayoutGrid className="h-5 w-5 mr-2" />
+                             Dashboard
                          </Link>
                      </Button>
-                 </nav>
-            </aside>
-            <div className="flex-1 flex flex-col overflow-y-auto hide-scrollbar">
+                </nav>
+                {/* Mobile Navigation */}
+                <div className="md:hidden">
+                    <Sheet>
+                      <SheetTrigger asChild>
+                        <Button variant="outline" size="icon">
+                          <Menu className="h-6 w-6" />
+                          <span className="sr-only">Toggle navigation menu</span>
+                        </Button>
+                      </SheetTrigger>
+                      <SheetContent side="right">
+                        <div className="grid gap-4 p-4">
+                            <Link href="/" className="flex items-center gap-2 font-semibold mb-4">
+                                <TaskZenIcon />
+                                <span className="text-lg">TaskZen</span>
+                            </Link>
+                            <nav className="grid gap-2">
+                                <Button variant="ghost" className="justify-start" asChild>
+                                     <Link href="/tasks">
+                                         <ListTodo className="h-5 w-5 mr-2" />
+                                         Tasks
+                                     </Link>
+                                 </Button>
+                                 <Button variant="ghost" className="justify-start" asChild>
+                                     <Link href="/">
+                                         <LayoutGrid className="h-5 w-5 mr-2" />
+                                         Dashboard
+                                     </Link>
+                                 </Button>
+                            </nav>
+                        </div>
+                      </SheetContent>
+                    </Sheet>
+                </div>
+            </header>
+
+            <div className="flex-1 flex overflow-y-auto hide-scrollbar">
                 {children}
             </div>
          </div>

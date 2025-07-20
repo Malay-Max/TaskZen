@@ -25,9 +25,10 @@ To run this project locally, you'll need to set up a Firebase project and a Tele
 
 ### 3. Configure Environment Variables
 
-1.  In the root of your project, create a new file named `.env.local` if it doesn't exist.
+1.  In the root of your project, create a new file named **`.env.local`**.
 2.  Copy the contents of `.env` into your new `.env.local` file.
-3.  Replace the placeholder values with your Firebase credentials (from step 1.6), your Telegram Bot Token and Chat ID (from step 2), and create a secure, random string for `CRON_SECRET`.
+3.  Replace the placeholder values in `.env.local` with your Firebase credentials (from step 1.6), your Telegram Bot Token and Chat ID (from step 2), and create a secure, random string for `CRON_SECRET`.
+4.  The `.gitignore` file is configured to **never** commit `.env.local`, so your secret keys are safe.
 
 ### 4. Install Dependencies and Run
 
@@ -54,5 +55,3 @@ To get this working in your deployed application:
 4.  Create another repository secret named `PRODUCTION_URL` and set its value to the full URL of your deployed application (e.g., `https://your-app-name.vercel.app`).
 
 The GitHub Action will now automatically trigger your application's reminder endpoint on the defined schedule.
-
-Okay

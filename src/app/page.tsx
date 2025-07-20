@@ -2,11 +2,14 @@
 // src/app/page.tsx
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useCollection } from '@/hooks/use-collection';
 import type { Task, Project } from '@/types';
 import { subDays, startOfDay, isAfter } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from "@/hooks/use-toast";
+import { sendTestTelegramMessage } from '@/app/actions';
 
 import StatCard from '@/components/dashboard/stat-card';
 import TasksCompletedChart from '@/components/dashboard/tasks-completed-chart';
@@ -18,8 +21,29 @@ export default function DashboardPage() {
   const { data: tasks, loading: tasksLoading, error: tasksError } = useCollection<Task>('tasks');
   const { data: projects, loading: projectsLoading, error: projectsError } = useCollection<Project>('projects');
   
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const { toast } = useToast();
+
   const loading = tasksLoading || projectsLoading;
   const error = tasksError || projectsError;
+
+  const handleSendTest = async () => {
+    setIsSendingTest(true);
+    const result = await sendTestTelegramMessage();
+    if (result.success) {
+      toast({
+        title: "Success!",
+        description: result.message,
+      });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: result.message,
+      });
+    }
+    setIsSendingTest(false);
+  };
 
   const dashboardData = useMemo(() => {
     if (loading || error || !tasks || !projects) {
@@ -98,7 +122,17 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+        <Button onClick={handleSendTest} disabled={isSendingTest}>
+            {isSendingTest ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+                <Send className="mr-2 h-4 w-4" />
+            )}
+            Send Test Reminder
+        </Button>
+      </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Tasks" value={dashboardData.totalTasks} />
         <StatCard title="Active Tasks" value={dashboardData.activeTasks} />

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo } from 'react';
@@ -30,9 +31,10 @@ interface TaskItemProps {
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onLogProgress: (task: Task) => void;
+  onView: (task: Task) => void;
 }
 
-export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgress }: TaskItemProps) {
+export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgress, onView }: TaskItemProps) {
   const { id, title, description, completed, dueDate, tags, recurrence, goal, progress } = task;
 
   const dueDateStatus = dueDate
@@ -52,26 +54,39 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
     if (!goal || !goal.target) return 0;
     return (currentProgress / goal.target) * 100;
   }, [currentProgress, goal]);
+  
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Stop propagation if the click is on an interactive element
+    if ((e.target as HTMLElement).closest('[data-interactive]')) {
+      return;
+    }
+    onView(task);
+  };
 
   return (
-    <Card className={cn(
-        "flex flex-col transition-all hover:shadow-md", 
-        completed ? "bg-card/60" : "bg-card"
-    )}>
+    <Card 
+        className={cn(
+            "flex flex-col transition-all hover:shadow-md cursor-pointer", 
+            completed ? "bg-card/60" : "bg-card"
+        )}
+        onClick={handleCardClick}
+    >
       <CardHeader className="flex flex-row items-start gap-4 space-y-0 pb-2">
-        {!recurrence && (
-          <Checkbox
-            id={`task-${id}`}
-            checked={completed}
-            onCheckedChange={() => onToggle(id)}
-            className="mt-1 shrink-0"
-          />
-        )}
-        {recurrence && (
-            <div className="mt-1 shrink-0">
-                <Repeat className="w-4 h-4 text-muted-foreground" />
-            </div>
-        )}
+        <div data-interactive onClick={(e) => e.stopPropagation()}>
+            {!recurrence && (
+            <Checkbox
+                id={`task-${id}`}
+                checked={completed}
+                onCheckedChange={() => onToggle(id)}
+                className="mt-1 shrink-0"
+            />
+            )}
+            {recurrence && (
+                <div className="mt-1 shrink-0">
+                    <Repeat className="w-4 h-4 text-muted-foreground" />
+                </div>
+            )}
+        </div>
         <div className="flex-1">
           <CardTitle
             className={cn(
@@ -82,29 +97,31 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
             {title}
           </CardTitle>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(task)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              <span>Edit</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDelete(id)} className="text-destructive focus:text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div data-interactive onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                <MoreVertical className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit(task)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                <span>Edit</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(id)} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete</span>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
       </CardHeader>
 
       <CardContent className="pt-0 pb-4 flex-1 space-y-4">
         {description && (
           <p className={cn(
-            "text-sm text-muted-foreground",
+            "text-sm text-muted-foreground truncate",
             completed && "line-through"
           )}>
             {description}
@@ -148,10 +165,12 @@ export default function TaskItem({ task, onToggle, onEdit, onDelete, onLogProgre
             ))}
         </div>
         {goal && (
-          <Button variant="outline" size="sm" onClick={() => onLogProgress(task)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Log
-          </Button>
+          <div data-interactive onClick={(e) => e.stopPropagation()}>
+             <Button variant="outline" size="sm" onClick={() => onLogProgress(task)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Log
+            </Button>
+          </div>
         )}
       </CardFooter>
     </Card>

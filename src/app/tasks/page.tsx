@@ -21,6 +21,7 @@ import ProjectList from '@/components/project-list';
 import TaskItem from '@/components/task-item';
 import TaskForm from '@/components/task-form';
 import ProgressLogDialog from '@/components/progress-log-dialog';
+import TaskDetailModal from '@/components/task-detail-modal';
 import {
   Sheet,
   SheetContent,
@@ -47,6 +48,7 @@ export default function TasksPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [loggingTask, setLoggingTask] = useState<Task | null>(null);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -98,6 +100,10 @@ export default function TasksPage() {
     setEditingTask(task);
     setIsFormOpen(true);
   };
+  
+  const handleViewTask = (task: Task) => {
+    setViewingTask(task);
+  }
 
   const handleDeleteTask = async (taskId: string) => {
      if (window.confirm("Are you sure you want to delete this task?")) {
@@ -240,6 +246,7 @@ export default function TasksPage() {
                   onEdit={handleEditTask}
                   onDelete={handleDeleteTask}
                   onLogProgress={() => setLoggingTask(task)}
+                  onView={handleViewTask}
                 />
               ))}
             </div>
@@ -269,6 +276,11 @@ export default function TasksPage() {
         task={loggingTask}
         onOpenChange={() => setLoggingTask(null)}
         onLogProgress={handleLogProgress}
+      />
+      <TaskDetailModal
+        task={viewingTask}
+        projects={projects || []}
+        onOpenChange={() => setViewingTask(null)}
       />
     </main>
     </div>

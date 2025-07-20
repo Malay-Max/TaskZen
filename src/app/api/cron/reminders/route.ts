@@ -1,3 +1,4 @@
+
 // src/app/api/cron/reminders/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchTasksWithTags } from '@/lib/firebase';
@@ -12,8 +13,8 @@ import {
   isSameDay,
 } from 'date-fns';
 
-// This is a simple in-memory cache to prevent sending the same reminder multiple times.
-// For a production system, you might use a more persistent store like Firestore or Redis.
+// This is a simple in-memory cache to prevent sending the same reminder multiple times *within a single cron job execution*.
+// For a production system with multiple server instances, a more persistent store like Firestore or Redis would be needed.
 const sentReminders = new Set<string>();
 
 const RECURRING_REMINDER_HOUR = 19; // 7 PM
@@ -37,10 +38,11 @@ export async function POST(request: NextRequest) {
         // --- Standard (One-Off) Task Reminders ---
         if (task.dueDate && !task.recurrence) {
             const dueDate = new Date(task.dueDate);
-            const reminderTime = subDays(dueDate, REMINDER_WINDOW_DAYS);
 
             // Due Soon Reminder (1 day before)
-            const dueSoonKey = `${task.id}-${format(dueDate, 'yyyy-MM-dd')}-due-soon`;
+            const dueSoonKey = `${task.id}-due-soon-${format(dueDate, 'yyyy-MM-dd')}`;
+            const reminderTime = subDays(dueDate, REMINDER_WINDOW_DAYS);
+
             if (
                 isAfter(now, reminderTime) &&
                 isBefore(now, dueDate) &&
@@ -54,9 +56,10 @@ export async function POST(request: NextRequest) {
             
             // Imminent Reminders (30 and 10 mins before)
             const minutesUntilDue = differenceInMinutes(dueDate, now);
-            if(minutesUntilDue > 0) {
+            if (minutesUntilDue > 0) {
                 for (const window of IMMINENT_WINDOWS) {
-                    const imminentKey = `${task.id}-${format(dueDate, 'yyyy-MM-dd-HH-mm')}-imminent-${window}`;
+                    // This key ensures the reminder is sent only once in the 5-minute cron window
+                    const imminentKey = `${task.id}-imminent-${window}-${format(dueDate, 'yyyy-MM-dd-HH')}`; 
                     if (minutesUntilDue <= window && minutesUntilDue > (window - 5) && !sentReminders.has(imminentKey)) {
                         console.log(`Sending 'imminent' reminder for task: ${task.title}`);
                         await sendTelegramReminder(`❗ Task due in ${window} minutes: "${task.title}".`);
@@ -65,9 +68,8 @@ export async function POST(request: NextRequest) {
                 }
             }
 
-
             // Overdue Reminder
-            const overdueKey = `${task.id}-${format(dueDate, 'yyyy-MM-dd')}-overdue`;
+            const overdueKey = `${task.id}-overdue-${format(dueDate, 'yyyy-MM-dd')}`;
             if (isPast(dueDate) && !sentReminders.has(overdueKey)) {
                 console.log(`Sending 'overdue' reminder for task: ${task.title}`);
                 await sendTelegramReminder(`⚠️ Task overdue: "${task.title}" was due on ${format(dueDate, 'MMM d, p')}.`);
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
 
         // --- Recurring Task Reminders ---
         if (task.recurrence === 'daily') {
-            const recurringKey = `${task.id}-${todayStr}-recurring`;
+            const recurringKey = `${task.id}-recurring-${todayStr}`;
             const progressToday = task.progress?.some(p => p.date === todayStr);
 
             if (

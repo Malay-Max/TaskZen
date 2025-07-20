@@ -22,8 +22,11 @@ const REMINDER_WINDOW_DAYS = 1; // Remind 1 day before due
 const IMMINENT_WINDOWS = [30, 10]; // 30 and 10 minutes before
 
 export async function POST(request: NextRequest) {
+  console.log("Cron reminder endpoint triggered at:", new Date().toISOString());
+
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    console.error("Cron job unauthorized. Check CRON_SECRET.");
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

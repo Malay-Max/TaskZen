@@ -27,13 +27,15 @@ export async function sendTelegramReminder(message: string): Promise<any> {
     if (!response.ok) {
         const errorData = await response.json();
         console.error('Failed to send Telegram message:', errorData);
-        return errorData;
+        // Throw an error to ensure it's caught by the calling function
+        throw new Error(`Telegram API error: ${errorData.description || 'Unknown error'}`);
     }
     
     return await response.json();
 
   } catch (error) {
     console.error('Error sending Telegram reminder:', error);
-    return Promise.resolve({ ok: false, error: 'Fetch failed' });
+    // Re-throw the error so the cron job handler knows it failed.
+    throw error;
   }
 }

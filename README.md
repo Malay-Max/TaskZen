@@ -54,3 +54,5 @@ To get this working in your deployed application:
 4.  Create another repository secret named `PRODUCTION_URL` and set its value to the full URL of your deployed application (e.g., `https://your-app-name.vercel.app`).
 
 The GitHub Action will now automatically trigger your application's reminder endpoint on the defined schedule.
+
+Okay
